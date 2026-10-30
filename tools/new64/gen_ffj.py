@@ -36,7 +36,7 @@ L.mat("scoria", "grass_09009800", tint=(200, 135, 120), vary=0.14)
 L.mat("craterwall", "cave_09000000", tint=(150, 108, 100), world=360.0, vary=0.1, glow=1.3)
 L.mat("lava", "fire_09009000", tint=(255, 245, 235), unlit=True, glow=0.0, surface="SURFACE_BURNING", world=420.0,
       scroll=(-6, 10))
-L.mat("lavaglow", "mountain_0900C000", tint=(255, 235, 150), alpha=215, unlit=True, glow=0.0, surface=None,
+L.mat("lavaglow", "mountain_0900C000", tint=(255, 235, 150), alpha=150, unlit=True, glow=0.0, surface=None,
       world=480.0, scroll=(-14, 22))
 L.mat("lavafall", "fire_09009000", tint=(255, 240, 220), unlit=True, glow=0.0, world=300.0, scroll=(0, 120))
 L.mat("snow", "snow_09008800", tint=(245, 250, 255), vary=0.08)
