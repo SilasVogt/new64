@@ -17,6 +17,7 @@
 
 #include "make_const_nonconst.h"
 #include "levels/ffj/header.h"
+#include "pc/new64_music.h"
 #include "levels/ffj/layout.h"
 #include "levels/lll/header.h"
 
@@ -62,7 +63,7 @@ const LevelScript level_ffj_entry[] = {
         FFJ_EXIT_WARPS(),
         TERRAIN(/*terrainData*/ ffj_area_1_collision),
         MACRO_OBJECTS(/*objList*/ ffj_area_1_macro_objs),
-        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0000, /*seq*/ SEQ_LEVEL_SNOW),
+        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0000, /*seq*/ SEQ_NEW64_FROSTFIRE),
         TERRAIN_TYPE(/*terrainType*/ TERRAIN_SNOW),
     END_AREA(),
 
@@ -74,7 +75,7 @@ const LevelScript level_ffj_entry[] = {
         FFJ_EXIT_WARPS(),
         TERRAIN(/*terrainData*/ ffj_area_2_collision),
         MACRO_OBJECTS(/*objList*/ ffj_area_2_macro_objs),
-        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0001, /*seq*/ SEQ_LEVEL_UNDERGROUND),
+        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0001, /*seq*/ SEQ_NEW64_GLACIER_CAVE),
         TERRAIN_TYPE(/*terrainType*/ TERRAIN_SNOW),
     END_AREA(),
 
@@ -86,7 +87,7 @@ const LevelScript level_ffj_entry[] = {
         FFJ_EXIT_WARPS(),
         TERRAIN(/*terrainData*/ ffj_area_3_collision),
         MACRO_OBJECTS(/*objList*/ ffj_area_3_macro_objs),
-        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0001, /*seq*/ SEQ_LEVEL_HOT),
+        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0001, /*seq*/ SEQ_NEW64_MAGMA_HALL),
         TERRAIN_TYPE(/*terrainType*/ TERRAIN_STONE),
     END_AREA(),
 

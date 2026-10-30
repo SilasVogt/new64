@@ -13,6 +13,7 @@
 #include "pc/fs/fs.h"
 #include "pc/lua/utils/smlua_audio_utils.h"
 #include "pc/lua/smlua_hooks.h"
+#include "pc/new64_music.h"
 
 #define ALIGN16(val) (((val) + 0xF) & ~0xF)
 
@@ -1568,6 +1569,7 @@ void load_sequence(u32 player, u32 seqId, s32 loadAsync) {
     if (smlua_call_event_hooks(HOOK_ON_SEQ_LOAD, player, seqId, loadAsync, &seqIdOverride)) {
         seqId = seqIdOverride;
     }
+    seqId = new64_music_remap(seqId); // new64: original songs if custom music is off
 
     if (!loadAsync) {
         gAudioLoadLock = AUDIO_LOCK_LOADING;

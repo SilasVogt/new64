@@ -18,6 +18,7 @@
 #include "sound_init.h"
 #include "rumble_init.h"
 #include "pc/debuglog.h"
+#include "pc/new64_music.h"
 
 #define MUSIC_NONE 0xFFFF
 
@@ -119,6 +120,14 @@ void raise_background_noise(s32 a) {
     sVolumeLoweredState &= ~a;
 
     MUTEX_UNLOCK(gAudioThread);
+
+    // new64: a music switch made while paused takes effect on unpause
+    if (a == 1) { new64_music_apply_pending(); }
+}
+
+// new64: true while the pause menu has the music muted
+bool background_noise_is_muted(void) {
+    return (sVolumeLoweredState & 1) != 0;
 }
 
 /**

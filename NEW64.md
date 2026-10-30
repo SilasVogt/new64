@@ -81,6 +81,42 @@ vent during an eruption throws Mario into a slow twirl he can steer. The
 launch speed is the geyser's second behavior parameter byte; the hot spring's
 geysers are decorative (speed 0).
 
+## Music
+
+Both courses have their own soundtrack, composed for this project in
+`tools/new64/gen_music.py` and compiled in as real SM64 sequences, played
+through the game's own instrument banks (the same banks the original music
+uses):
+
+| Song | Where | Bank | Style |
+|------|-------|------|-------|
+| Sky Garden Isles | course 16 | 0x22 (Bob-omb Battlefield's brass, organ, slap bass) | bright D major, 126 bpm |
+| Frostfire Fjord | course 17 highlands | 0x25 (pan flute, horns, piano, strings) | Icelandic folk ballad, A dorian, 6/8 |
+| Glacier Cave | course 17 ice cave | 0x1C (music box, strings) | slow E minor, 76 bpm |
+| Magma Hall | course 17 magma hall | 0x1A (horns, trumpet, brass, timpani) | driving C minor, 144 bpm |
+
+**Switching back to the original music:** pause the game and untick
+**Custom course music** (also under Options > Sound). The new courses then play
+Bob-omb Battlefield, Cool Cool Mountain, Hazy Maze Cave and Lethal Lava Land.
+The setting is saved as `new64_custom_music` in `sm64config.txt`.
+
+How it is wired: `src/pc/new64_music.c` serves the songs (ids 0x70-0x73) to
+the sequence loader ahead of mod overrides, and `new64_music_remap()` in
+`load_sequence()` swaps in the vanilla songs when the setting is off.
+
+Editing music: change the note strings or arrangement in `gen_music.py`, run
+`python3 tools/new64/gen_music.py .`, rebuild. Each `|`-separated bar is
+checked for the right length. Some instrument samples sound an octave away
+from the written note; the measured corrections are in its `TUNE` table
+(`--calibrate` builds test sequences that play every instrument for
+re-measuring). Levels were matched against recordings of the vanilla themes.
+
+Recording the game's music cleanly: run with `SDL_AUDIODRIVER=dummy` and
+`NEW64_AUDIO_DUMP=/tmp/out.raw`; the raw file is 32 kHz signed 16-bit stereo
+(`ffmpeg -f s16le -ar 32000 -ac 2 -i /tmp/out.raw out.wav`). SDL's `disk`
+audio driver drops samples and makes recordings sound crunchy; the game
+itself does not.
+
 ## What changed from upstream
 
 - `levels/course_defines.h`: `COURSE_SGI` and `COURSE_FFJ` are main courses
@@ -107,7 +143,11 @@ geysers are decorative (speed 0).
 - `src/pc/network/socket/socket.c`: `NEW64_BIND_LOCALHOST` binds the host to
   loopback (used by `play.sh` and the tests).
 - `src/pc/gfx/gfx_sdl.c`: `NEW64_SHOT_DIR` dumps frames for automated
-  screenshots.
+  screenshots; `src/pc/audio/audio_sdl.c`: `NEW64_AUDIO_DUMP` records the
+  game's audio stream.
+- `src/pc/new64_music.*`, `src/audio/load.c`, `src/pc/lua/utils/smlua_audio_utils.c`,
+  `src/pc/configfile.*`, `src/pc/djui/djui_panel_pause.c`, `djui_panel_sound.c`:
+  the course music and its on/off switch.
 
 ## Editing the courses
 
@@ -134,6 +174,10 @@ cell-sized steps, with banks walled where the floor drops. Materials can
 scroll: the generator writes `levels/ffj/scroll.inc.c`, and
 `geo_ffj_scroll_textures` in `levels/ffj/geo.c` moves those textures every
 frame.
+
+`gen_ffj.py` also floods each cave from its entrance and stops with an error
+if any coin, star or enemy sits where Mario cannot walk to (a step up of more
+than 330 units counts as a wall).
 
 ## Tests
 

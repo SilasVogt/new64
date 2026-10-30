@@ -758,6 +758,7 @@ TUNNELS = [
     ((-1500, 0), (-3300, 0), 390, 40, 140, 700, "maze"),
     ((-3300, 0), (-3300, -2200), 370, 140, 260, 680, "maze"),
     ((-3300, 0), (-3300, 1900), 370, 140, 60, 680, "maze"),
+    ((-3300, 0), (-4300, -300), 360, 140, 180, 660, "maze"),     # to the west room
     ((-3300, -2200), (-1800, -3300), 360, 260, 260, 660, "maze"),
     ((1500, -300), (3000, -1000), 410, 40, 720, 760, "ramp"),
     ((3400, -2300), (1900, -3900), 400, 720, 380, 740, "slide"),
@@ -922,6 +923,40 @@ A2.obj("MODEL_MR_BLIZZARD", (-3300, 140, 600), "bhvMrBlizzard", 0)
 for x, z in [(3200, -1400), (3700, -1900)]:
     A2.obj("MODEL_CHILL_BULLY", (x, 740, z), "bhvSmallChillBully", 0)
 
+
+def check_reachable(grid, area, start, name, max_step=330):
+    """Flood the grid from start (walkable steps only) and fail if any coin,
+    star or enemy of the area sits in a cell Mario cannot walk to."""
+    def cell_of(x, z):
+        return (int((x - grid.x0) // grid.cell), int((z - grid.z0) // grid.cell))
+    def height(c):
+        return sum(c["floor"]) / 4
+    seen = {cell_of(*start)}
+    todo = list(seen)
+    while todo:
+        i, k = todo.pop()
+        here = grid.cells[(i, k)]
+        for di, dk in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nb = (i + di, k + dk)
+            c = grid.cells.get(nb)
+            if c is None or nb in seen:
+                continue
+            if height(c) - height(here) > max_step:   # too high to climb
+                continue
+            seen.add(nb)
+            todo.append(nb)
+    missing = []
+    for preset, _, (x, y, z), _ in area.macros:
+        if cell_of(x, z) not in seen:
+            missing.append(f"{preset} at {x:.0f},{y:.0f},{z:.0f}")
+    for model, (x, y, z), *_ in area.objects:
+        if cell_of(x, z) not in seen and grid.cells.get(cell_of(x, z)) is not None:
+            missing.append(f"{model} at {x:.0f},{y:.0f},{z:.0f}")
+    assert not missing, f"{name}: unreachable from the entrance: " + "; ".join(missing)
+
+
+check_reachable(G2, A2, (0, 3700), "ice cave")
+
 # ==========================================================================
 # Area 3: lava tube and the magma hall
 # ==========================================================================
@@ -1065,6 +1100,8 @@ A3.macro("macro_coin_line_horizontal", (0, 0, -5000), yaw=90)
 A3.macro("macro_coin_line_horizontal", (-3300, 0, -1300))
 A3.macro("macro_coin_line_horizontal", (3300, 0, -1300))
 A3.macro("macro_1up", (ISLANDS3[2][0], ISLANDS3[2][3] + 40, ISLANDS3[2][1]))
+
+check_reachable(G3, A3, (0, 4550), "magma hall")
 
 # ==========================================================================
 # Custom models

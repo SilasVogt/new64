@@ -15,6 +15,7 @@
 
 #include "make_const_nonconst.h"
 #include "levels/sgi/header.h"
+#include "pc/new64_music.h"
 
 #include "levels/sgi/areas/1/objects.inc.c"
 
@@ -45,7 +46,7 @@ const LevelScript level_sgi_entry[] = {
         WARP_NODE(/*id*/ 0xF1, /*destLevel*/ LEVEL_CASTLE_GROUNDS, /*destArea*/ 0x01, /*destNode*/ 0x20, /*flags*/ WARP_NO_CHECKPOINT),
         TERRAIN(/*terrainData*/ sgi_area_1_collision),
         MACRO_OBJECTS(/*objList*/ sgi_area_1_macro_objs),
-        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0000, /*seq*/ SEQ_LEVEL_GRASS),
+        SET_BACKGROUND_MUSIC(/*settingsPreset*/ 0x0000, /*seq*/ SEQ_NEW64_SKY_GARDEN),
         TERRAIN_TYPE(/*terrainType*/ TERRAIN_GRASS),
     END_AREA(),
 
