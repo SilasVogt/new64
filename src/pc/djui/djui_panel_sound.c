@@ -5,6 +5,12 @@
 #include "pc/configfile.h"
 #include "pc/lua/utils/smlua_audio_utils.h"
 #include "game/sound_init.h"
+#include "pc/new64_music.h"
+
+// new64: switch the new courses between their own music and the originals
+static void djui_panel_sound_new64_music_changed(UNUSED struct DjuiBase* caller) {
+    new64_music_refresh();
+}
 
 static void djui_panel_sound_value_change(UNUSED struct DjuiBase* caller) {
     audio_custom_update_volume();
@@ -28,6 +34,7 @@ void djui_panel_sound_create(struct DjuiBase* caller) {
 
         djui_checkbox_create(body, DLANG(SOUND, FADEOUT), &configFadeoutDistantSounds, NULL);
         djui_checkbox_create(body, DLANG(SOUND, MUTE_FOCUS_LOSS), &configMuteFocusLoss, NULL);
+        djui_checkbox_create(body, "Custom course music", &configNew64CustomMusic, djui_panel_sound_new64_music_changed);
 
         djui_button_create(body, DLANG(MENU, BACK), DJUI_BUTTON_STYLE_BACK, djui_panel_menu_back);
     }

@@ -14,6 +14,8 @@
 #include "pc/lua/smlua_hooks.h"
 #include "game/object_helpers.h"
 #include "behavior_table.h"
+#include "pc/new64_music.h"
+#include "pc/configfile.h"
 
 bool gDjuiPanelPauseCreated = false;
 
@@ -50,6 +52,10 @@ static void djui_panel_pause_quit(struct DjuiBase* caller) {
                                 DLANG(PAUSE, QUIT_CLIENT),
                                 djui_panel_pause_quit_yes);
     }
+}
+
+static void djui_panel_new64_music_changed(UNUSED struct DjuiBase* caller) {
+    new64_music_refresh();
 }
 
 void djui_panel_pause_create(struct DjuiBase* caller) {
@@ -106,6 +112,9 @@ void djui_panel_pause_create(struct DjuiBase* caller) {
         } else if (gHookedModMenuElementsCount > 0) {
             djui_button_create(body, DLANG(PAUSE, MOD_MENU), DJUI_BUTTON_STYLE_NORMAL, djui_panel_mod_menu_create);
         }
+
+        // new64: switch the new courses between their own music and the original songs
+        djui_checkbox_create(body, "Custom course music", &configNew64CustomMusic, djui_panel_new64_music_changed);
 
         djui_button_create(body, DLANG(PAUSE, RESUME), DJUI_BUTTON_STYLE_NORMAL, djui_panel_pause_resume);
 

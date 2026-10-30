@@ -13,6 +13,7 @@
 #include "pc/pc_main.h"
 #include "pc/fs/fmem.h"
 #include "audio/load.h"
+#include "pc/new64_music.h"
 
 struct AudioOverride {
     bool enabled;
@@ -65,6 +66,8 @@ void smlua_audio_utils_reset_all(void) {
 
 bool smlua_audio_utils_override(u8 sequenceId, s32* bankId, void** seqData) {
     if (sequenceId >= MAX_AUDIO_OVERRIDE) { return false; }
+    // new64: the new courses' built-in songs
+    if (new64_music_override(sequenceId, bankId, seqData)) { return true; }
     struct AudioOverride* override = &sAudioOverrides[sequenceId];
     if (!override->enabled) { return false; }
 
