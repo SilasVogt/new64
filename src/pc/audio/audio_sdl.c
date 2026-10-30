@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 #include <SDL2/SDL.h>
 
@@ -36,7 +38,21 @@ static int audio_sdl_get_desired_buffered(void) {
     return 1100;
 }
 
+// Dev aid: with NEW64_AUDIO_DUMP set, append every buffer the game produces
+// (32 kHz, s16 stereo) to that file, for clean recordings and analysis.
+static void audio_sdl_dev_dump(const uint8_t *buf, size_t len) {
+    static FILE *sDump = NULL;
+    static bool sChecked = false;
+    if (!sChecked) {
+        sChecked = true;
+        const char *path = getenv("NEW64_AUDIO_DUMP");
+        if (path != NULL) { sDump = fopen(path, "wb"); }
+    }
+    if (sDump != NULL) { fwrite(buf, 1, len, sDump); fflush(sDump); }
+}
+
 static void audio_sdl_play(const uint8_t *buf, size_t len) {
+    audio_sdl_dev_dump(buf, len);
     if (audio_sdl_buffered() < 6000) {
         // Don't fill the audio buffer too much in case this happens
         SDL_QueueAudio(dev, buf, len);

@@ -111,6 +111,12 @@ from the written note; the measured corrections are in its `TUNE` table
 (`--calibrate` builds test sequences that play every instrument for
 re-measuring). Levels were matched against recordings of the vanilla themes.
 
+Recording the game's music cleanly: run with `SDL_AUDIODRIVER=dummy` and
+`NEW64_AUDIO_DUMP=/tmp/out.raw`; the raw file is 32 kHz signed 16-bit stereo
+(`ffmpeg -f s16le -ar 32000 -ac 2 -i /tmp/out.raw out.wav`). SDL's `disk`
+audio driver drops samples and makes recordings sound crunchy; the game
+itself does not.
+
 ## What changed from upstream
 
 - `levels/course_defines.h`: `COURSE_SGI` and `COURSE_FFJ` are main courses
@@ -137,7 +143,8 @@ re-measuring). Levels were matched against recordings of the vanilla themes.
 - `src/pc/network/socket/socket.c`: `NEW64_BIND_LOCALHOST` binds the host to
   loopback (used by `play.sh` and the tests).
 - `src/pc/gfx/gfx_sdl.c`: `NEW64_SHOT_DIR` dumps frames for automated
-  screenshots.
+  screenshots; `src/pc/audio/audio_sdl.c`: `NEW64_AUDIO_DUMP` records the
+  game's audio stream.
 - `src/pc/new64_music.*`, `src/audio/load.c`, `src/pc/lua/utils/smlua_audio_utils.c`,
   `src/pc/configfile.*`, `src/pc/djui/djui_panel_pause.c`, `djui_panel_sound.c`:
   the course music and its on/off switch.
