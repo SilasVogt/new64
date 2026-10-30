@@ -133,9 +133,6 @@ static inline void bswap_menudata(struct MainMenuSaveData *data) {
  * Byteswap all multibyte fields in a SaveFile.
  */
 static inline void bswap_savefile(struct SaveFile *data) {
-    data->capPos[0] = BSWAP16(data->capPos[0]);
-    data->capPos[1] = BSWAP16(data->capPos[1]);
-    data->capPos[2] = BSWAP16(data->capPos[2]);
     data->flags = BSWAP32(data->flags);
     bswap_signature(&data->signature);
 }
@@ -782,6 +779,9 @@ void save_file_set_cannon_unlocked(void) {
     network_send_save_set_flag(gCurrSaveFileNum - 1, gCurrCourseNum, 0x80, SAVE_FLAG_FILE_EXISTS);
 }
 
+// new64: cap position lives in RAM only, see struct SaveFile.
+static Vec3s sCapPos[NUM_SAVE_FILES] = { 0 };
+
 void save_file_set_cap_pos(s16 x, s16 y, s16 z) {
     if (INVALID_FILE_INDEX(gCurrSaveFileNum - 1)) { return; }
     if (INVALID_SRC_SLOT(gSaveFileUsingBackupSlot)) { return; }
@@ -789,7 +789,7 @@ void save_file_set_cap_pos(s16 x, s16 y, s16 z) {
 
     saveFile->capLevel = gCurrLevelNum;
     saveFile->capArea = gCurrAreaIndex;
-    vec3s_set(saveFile->capPos, x, y, z);
+    vec3s_set(sCapPos[gCurrSaveFileNum - 1], x, y, z);
     save_file_set_flags(SAVE_FLAG_CAP_ON_GROUND);
 }
 
@@ -801,7 +801,7 @@ s32 save_file_get_cap_pos(VEC_OUT Vec3s capPos) {
 
     if (saveFile->capLevel == gCurrLevelNum && saveFile->capArea == gCurrAreaIndex
         && (flags & SAVE_FLAG_CAP_ON_GROUND)) {
-        vec3s_copy(capPos, saveFile->capPos);
+        vec3s_copy(capPos, sCapPos[gCurrSaveFileNum - 1]);
         return TRUE;
     }
     return FALSE;

@@ -20,13 +20,11 @@ struct SaveBlockSignature
 struct SaveFile
 {
     // Location of lost cap.
-    // Note: the coordinates get set, but are never actually used, since the
-    // cap can always be found in a fixed spot within the course
+    // new64: the cap coordinates are no longer persisted (they were never
+    // used, the cap always sits in a fixed spot). Dropping them frees the
+    // bytes for course 16 and keeps the EEPROM image at 512 bytes.
     u8 capLevel;
     u8 capArea;
-    Vec3s capPos;
-
-    u32 flags;
 
     // Star flags for each course.
     // The most significant bit of the byte *following* each course is set if the
@@ -34,6 +32,8 @@ struct SaveFile
     u8 courseStars[COURSE_COUNT];
 
     u8 courseCoinScores[COURSE_STAGES_COUNT];
+
+    u32 flags;
 
     struct SaveBlockSignature signature;
 };

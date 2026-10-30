@@ -2755,14 +2755,15 @@ void print_save_file_scores(s8 fileIndex) {
     PRINT_COURSE_SCORES(COURSE_THI, 0)
     PRINT_COURSE_SCORES(COURSE_TTC, 0)
     PRINT_COURSE_SCORES(COURSE_RR,  0)
+    PRINT_COURSE_SCORES(COURSE_SGI, 0)
 
 #undef PRINT_COURSE_SCORES
 
     // Print castle secret stars text
-    print_menu_generic_string(LEVEL_NAME_X + SECRET_STARS_PAD, 23 + 12 * 16,
-                              segmented_to_virtual(levelNameTable[25]));
+    print_menu_generic_string(LEVEL_NAME_X + SECRET_STARS_PAD, 23 + 12 * (COURSE_STAGES_COUNT + 1),
+                              segmented_to_virtual(levelNameTable[COURSE_MAX]));
     // Print castle secret stars score
-    print_score_file_castle_secret_stars(fileIndex, STAR_SCORE_X, 23 + 12 * 16);
+    print_score_file_castle_secret_stars(fileIndex, STAR_SCORE_X, 23 + 12 * (COURSE_STAGES_COUNT + 1));
 
     // Print current coin score mode
     if (sScoreFileCoinScoreMode == 0) {

@@ -1367,8 +1367,11 @@ $(BUILD_DIR)/text/%/define_text.inc.c: text/define_text.inc.c text/%/courses.h t
 	@$(PRINT) "$(GREEN)Preprocessing: $(BLUE)$@ $(NO_COL)\n"
 	$(V)$(CPP) $(PROF_FLAGS) $(CPPFLAGS) $< -o - -I text/$*/ | $(TEXTCONV) charmap.txt - $@
 
+# new64: course 16 text is included by define_text.inc.c
+$(BUILD_DIR)/text/us/define_text.inc.c: text/us/new64_courses.inc.c
+
 # Level headers
-$(BUILD_DIR)/include/level_headers.h: levels/level_headers.h.in
+$(BUILD_DIR)/include/level_headers.h: levels/level_headers.h.in levels/level_defines.h
 	$(call print,Preprocessing level headers:,$<,$@)
 	$(V)$(CPP) $(PROF_FLAGS) $(CPPFLAGS) -I . levels/level_headers.h.in | $(PYTHON) $(TOOLS_DIR)/output_level_headers.py > $(BUILD_DIR)/include/level_headers.h
 
