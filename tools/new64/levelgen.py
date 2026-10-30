@@ -591,8 +591,12 @@ class Grid:
         for j in range(4):
             jn = (j + 1) % 4
             if s[j] != s[jn]:
+                edge = None if whole else self._border_edge(V[j], V[jn])
                 if whole:
                     x, z = self._crossing(ids[j], ids[jn], fn, keyf)
+                elif edge is not None:
+                    # On the cell's border: the very crossing the neighbour uses
+                    x, z = self._crossing(ids[edge[0]], ids[edge[1]], fn, keyf)
                 else:
                     x, z = self._sub_crossing(V[j][2:], V[jn][2:], fn, keyf)
                 X[j] = ((x - x0) / cs, (z - z0) / cs, x, z)
@@ -623,6 +627,31 @@ class Grid:
             polys.append((mid, [C, hexa[n], hexa[(n + 1) % len(hexa)]]))
         return polys, cuts
 
+    @staticmethod
+    def _border_edge(a, b):
+        """The cell edge (corner indices) a sub-edge between (u, v, ..) points
+        lies on, or None if it runs through the inside of the cell."""
+        for coord, val, edge in ((1, 0.0, (0, 1)), (0, 1.0, (1, 2)), (1, 1.0, (3, 2)), (0, 0.0, (0, 3))):
+            if a[coord] == val and b[coord] == val:
+                return edge
+        return None
+
+    def _border_region(self, c, i, k, u, v):
+        """Region at a point on the cell's border, as the neighbouring cell
+        sees that edge: its two corners and at most one crossing. Sampling the
+        region there instead could find a sliver the neighbour never draws."""
+        R = c["regions"]
+        j0, j1, t = {(1, 0.0): (0, 1, u), (0, 1.0): (1, 2, v), (1, 1.0): (3, 2, u), (0, 0.0): (0, 3, v)}[
+            (1, v) if v in (0.0, 1.0) else (0, u)]
+        a, b = R[j0], R[j1]
+        if a.key == b.key:
+            return a
+        keyf = _hkey if a.hkey != b.hkey else _rkey
+        ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+        x, z = self._crossing(ids[j0], ids[j1], c["region"], keyf)
+        tx = math.dist(self.corner(*ids[j0]), (x, z)) / self.cell
+        return a if t < tx else b
+
     def _surf(self, c, r):
         s = c.get("surface", r.surface)
         return self.a.level.mats[r.mat].surface if s == "mat" else s
@@ -637,8 +666,10 @@ class Grid:
     def _square_pieces(self, c, i, k, sq, R4, depth):
         """Pieces of one square: {reg, poly | tris, visual, collide}, and cut
         walls (p, q, regs, ref, ref_side). Where three height classes meet
-        (a lava stream reaching a lake past its bank) the square is quartered
-        until every part has at most two, so each meeting gets proper walls."""
+        (a lava stream reaching a lake past its bank) the square is quartered,
+        up to three times, so each meeting gets the normal split and walls; at
+        the meeting point itself the last tiny square is split into its
+        corners' quarters, flat, with walls between them."""
         u0, v0, u1, v1 = sq
         quad = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1),
                 self._uvxz(i, k, u0, v1)]
@@ -647,8 +678,10 @@ class Grid:
         fn = c["region"]
         if len(hk) > 2:
             um, vm = (u0 + u1) / 2, (v0 + v1) / 2
-            if depth < 2:
+            if depth < 3:
                 def at(u, v):
+                    if u in (0.0, 1.0) or v in (0.0, 1.0):
+                        return self._border_region(c, i, k, u, v)
                     q = self._uvxz(i, k, u, v)
                     return fn(q[2], q[3])
                 rb, rr, rt, rl, rc = at(um, v0), at(u1, vm), at(um, v1), at(u0, vm), at(um, vm)
@@ -659,13 +692,21 @@ class Grid:
                     pieces += p2
                     walls += w2
                 return pieces, walls
-            # Still three classes in a tiny square: slope between its corners
-            ys = [r.level if r.level is not None else self._plane(c["floor"], q[0], q[1]) - r.drop
-                  for r, q in zip(R4, quad)]
-            pts = [(q[2], y, q[3]) for q, y in zip(quad, ys)]
-            centre = self._uvxz(i, k, um, vm)
-            return [{"reg": fn(centre[2], centre[3]), "tris": [(pts[0], pts[1], pts[2]), (pts[0], pts[2], pts[3])],
-                     "visual": True, "collide": True}], []
+            quarters = ((u0, v0, um, vm), (um, v0, u1, vm), (um, vm, u1, v1), (u0, vm, um, v1))
+            pieces = []
+            for r, (a0, b0, a1, b1) in zip(R4, quarters):
+                poly = [self._uvxz(i, k, a0, b0), self._uvxz(i, k, a1, b0), self._uvxz(i, k, a1, b1),
+                        self._uvxz(i, k, a0, b1)]
+                pieces.append({"reg": r, "poly": poly, "visual": True, "collide": True})
+            walls = []
+            for ja, jb, (pa, pb) in ((0, 1, ((um, v0), (um, vm))), (1, 2, ((um, vm), (u1, vm))),
+                                     (2, 3, ((um, vm), (um, v1))), (3, 0, ((u0, vm), (um, vm)))):
+                if R4[ja].hkey != R4[jb].hkey:
+                    qa, qb = self._uvxz(i, k, *pa), self._uvxz(i, k, *pb)
+                    qa0, qa1 = quarters[ja][0:2], quarters[ja][2:4]
+                    ref = self._uvxz(i, k, (qa0[0] + qa1[0]) / 2, (qa0[1] + qa1[1]) / 2)
+                    walls.append((qa[2:], qb[2:], {0: R4[ja], 1: R4[jb]}, ref[2:], 0))
+            return pieces, walls
         if len(keys) == 1:
             return [{"reg": R4[0], "poly": quad, "visual": True, "collide": True}], []
         if len(hk) == 1:
