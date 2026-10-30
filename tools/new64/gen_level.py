@@ -409,7 +409,7 @@ def build():
     L.macro("macro_coin_line_horizontal", (-650, 0, 5000), yaw=0)
     L.macro("macro_coin_line_horizontal", (0, 100, 2650), yaw=0)
     L.macro("macro_coin_ring_horizontal", (-1050, 200, 250))
-    L.macro("macro_coin_ring_horizontal", (1050, 200, -350))
+    L.macro("macro_coin_ring_horizontal", (1500, 200, -200))
     L.macro("macro_coin_line_horizontal", (1300, 200, 300), yaw=90)
     L.macro("macro_coin_line_horizontal", (-300, 200, -1300), yaw=90)
     for x, y, z in steps:

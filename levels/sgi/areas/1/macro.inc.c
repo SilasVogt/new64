@@ -28,7 +28,7 @@ const MacroObject sgi_area_1_macro_objs[] = {
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 0, /*pos*/ -650, 0, 5000),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 0, /*pos*/ 0, 100, 2650),
     MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ -1050, 200, 250),
-    MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ 1050, 200, -350),
+    MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ 1500, 200, -200),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 90, /*pos*/ 1300, 200, 300),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 90, /*pos*/ -300, 200, -1300),
     MACRO_OBJECT(/*preset*/ macro_yellow_coin, /*yaw*/ 0, /*pos*/ 0, 370, 650),
