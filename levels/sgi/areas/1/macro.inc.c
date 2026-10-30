@@ -9,7 +9,7 @@ const MacroObject sgi_area_1_macro_objs[] = {
     MACRO_OBJECT(/*preset*/ macro_red_coin, /*yaw*/ 0, /*pos*/ -4350, 1000, -3050),
     MACRO_OBJECT(/*preset*/ macro_red_coin, /*yaw*/ 0, /*pos*/ -2250, 300, 450),
     MACRO_OBJECT(/*preset*/ macro_1up, /*yaw*/ 0, /*pos*/ 3400, 2000, -5050),
-    MACRO_OBJECT_WITH_BEH_PARAM(/*preset*/ macro_cannon_closed, /*yaw*/ 0, /*pos*/ 900, 200, -1250, /*behParam*/ 0x00),
+    MACRO_OBJECT_WITH_BEH_PARAM(/*preset*/ macro_cannon_closed, /*yaw*/ 0, /*pos*/ 900, 600, -1250, /*behParam*/ 0x2A),
     MACRO_OBJECT(/*preset*/ macro_bobomb_buddy_opens_cannon, /*yaw*/ 0, /*pos*/ 550, 200, -1050),
     MACRO_OBJECT(/*preset*/ macro_hidden_star_trigger, /*yaw*/ 0, /*pos*/ 0, 260, -560),
     MACRO_OBJECT(/*preset*/ macro_hidden_star_trigger, /*yaw*/ 0, /*pos*/ 0, 60, 6000),

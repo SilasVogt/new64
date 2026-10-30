@@ -224,7 +224,7 @@ class Level:
             for i in range(segments):
                 j = (i + 1) % segments
                 a, b = (cpts[i][0], y1, cpts[i][1]), (cpts[j][0], y1, cpts[j][1])
-                uv = lambda p: ((p[0] - cx) / (cr * 2) + 0.5, (p[2] - cz) / (cr * 2) + 0.5)
+                uv = lambda p: ((p[0] - cx) / 280.0, (p[2] - cz) / 280.0)
                 self.tri(cap, c, a, b, (uv(c), uv(a), uv(b)), (0, 1, 0))
             if cap_r and cap_r > r:
                 # Overhanging cap: underside ring + rim wall
@@ -339,6 +339,16 @@ def build():
     # A pillar on the spawn isle to hop on
     L.cylinder(-900, 5500, 130, -20, 260, segments=10, side="stone", cap="stone")
 
+    # Cannon pedestal on the central isle: a hollow stone frame (240 wide pit,
+    # like vanilla cannon holes) with two steps up from the south.
+    cx, cz, rim = 900, -1250, 600
+    h = rim - C[1]
+    for (ox, oz, w, d) in ((0, -220, 640, 200), (0, 220, 640, 200), (220, 0, 200, 240), (-220, 0, 200, 240)):
+        L.obox((cx + ox, rim, cz + oz), (w, h, d), 0, top="stone", side="stone", bottom="stone", collide_bottom=False)
+    L.obox((cx, 470, cz + 440), (300, 270, 240), 0, top="stone", side="stone", bottom="stone", collide_bottom=False)
+    L.obox((cx, 340, cz + 680), (300, 140, 240), 0, top="stone", side="stone", bottom="stone", collide_bottom=False)
+    lay["cannon"] = (cx, rim, cz)
+
     L.death_plane(-3000, 14000)
 
     # ---------------- objects ----------------
@@ -372,7 +382,10 @@ def build():
     # Star 4 (index 3): the lonely isle, only reachable by cannon
     L.obj("MODEL_STAR", (Lonely[0], Lonely[1] + 200, Lonely[2]), "bhvStar", 0x03000000)
     L.macro("macro_1up", (Lonely[0] + 200, Lonely[1], Lonely[2] + 150))
-    L.macro("macro_cannon_closed", (900, 200, -1250), param=0x00)
+    # The cannon's yaw comes from the 2nd behParam byte (<< 8), and its swivel
+    # animation ends 90 deg past that: 0x2A (59 deg) + 90 = 149 deg, pointing at
+    # the lonely isle. The player can turn +-90 deg from there.
+    L.macro("macro_cannon_closed", lay["cannon"], param=0x2A)
     L.macro("macro_bobomb_buddy_opens_cannon", (550, 200, -1050))
 
     # Star 5 (index 4): five secrets, star appears in the central garden
