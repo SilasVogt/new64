@@ -426,20 +426,6 @@ def _inside(poly, u, v, eps=1e-9):
     return True
 
 
-def _tri_height(t, x, z, eps=1e-6):
-    """Height of triangle t ((x, y, z) x3) at (x, z), or None if outside."""
-    (ax, ay, az), (bx, by, bz), (cx, cy, cz) = t
-    d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz)
-    if abs(d) < 1e-9:
-        return None
-    wa = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d
-    wb = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d
-    wc = 1 - wa - wb
-    if min(wa, wb, wc) < -eps:
-        return None
-    return wa * ay + wb * by + wc * cy
-
-
 class Grid:
     """2.5D grid for terrain and caves.
 
@@ -511,14 +497,7 @@ class Grid:
             return self._plane(c["floor"], u, v)
         pieces, _ = self._cell_pieces(i, k, c)
         for pc in pieces:
-            if not pc["visual"]:
-                continue
-            if "tris" in pc:
-                for t in pc["tris"]:
-                    y = _tri_height(t, x, z)
-                    if y is not None:
-                        return y
-            elif _inside(pc["poly"], u, v):
+            if pc["visual"] and _inside(pc["poly"], u, v):
                 r = pc["reg"]
                 return r.level if r.level is not None else self._plane(c["floor"], u, v) - r.drop
         r = fn(x, z)
@@ -664,12 +643,11 @@ class Grid:
         return c["_pieces"]
 
     def _square_pieces(self, c, i, k, sq, R4, depth):
-        """Pieces of one square: {reg, poly | tris, visual, collide}, and cut
+        """Pieces of one square: {reg, poly, visual, collide}, and cut
         walls (p, q, regs, ref, ref_side). Where three height classes meet
         (a lava stream reaching a lake past its bank) the square is quartered,
-        up to three times, so each meeting gets the normal split and walls; at
-        the meeting point itself the last tiny square is split into its
-        corners' quarters, flat, with walls between them."""
+        up to three times, so each meeting gets the normal split and walls; the
+        last tiny square at the meeting point is fanned from its centre."""
         u0, v0, u1, v1 = sq
         quad = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1),
                 self._uvxz(i, k, u0, v1)]
@@ -692,20 +670,32 @@ class Grid:
                     pieces += p2
                     walls += w2
                 return pieces, walls
-            quarters = ((u0, v0, um, vm), (um, v0, u1, vm), (um, vm, u1, v1), (u0, vm, um, v1))
-            pieces = []
-            for r, (a0, b0, a1, b1) in zip(R4, quarters):
-                poly = [self._uvxz(i, k, a0, b0), self._uvxz(i, k, a1, b0), self._uvxz(i, k, a1, b1),
-                        self._uvxz(i, k, a0, b1)]
-                pieces.append({"reg": r, "poly": poly, "visual": True, "collide": True})
-            walls = []
-            for ja, jb, (pa, pb) in ((0, 1, ((um, v0), (um, vm))), (1, 2, ((um, vm), (u1, vm))),
-                                     (2, 3, ((um, vm), (um, v1))), (3, 0, ((u0, vm), (um, vm)))):
-                if R4[ja].hkey != R4[jb].hkey:
-                    qa, qb = self._uvxz(i, k, *pa), self._uvxz(i, k, *pb)
-                    qa0, qa1 = quarters[ja][0:2], quarters[ja][2:4]
-                    ref = self._uvxz(i, k, (qa0[0] + qa1[0]) / 2, (qa0[1] + qa1[1]) / 2)
-                    walls.append((qa[2:], qb[2:], {0: R4[ja], 1: R4[jb]}, ref[2:], 0))
+            # The meeting point itself: fan the square from its centre. Each
+            # stretch of its border keeps its corner's class up to the same
+            # crossings the neighbouring squares use, so the edges match
+            # exactly; walls run from the centre out to each crossing.
+            ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+            x0, z0 = self.corner(i, k)
+            ring = []
+            for j in range(4):
+                jn = (j + 1) % 4
+                ring.append((quad[j], R4[j]))
+                if R4[j].hkey != R4[jn].hkey:
+                    edge = self._border_edge(quad[j], quad[jn])
+                    if edge is not None:
+                        x, z = self._crossing(ids[edge[0]], ids[edge[1]], fn, _hkey)
+                    else:
+                        x, z = self._sub_crossing(quad[j][2:], quad[jn][2:], fn, _hkey)
+                    ring.append((((x - x0) / self.cell, (z - z0) / self.cell, x, z), R4[jn]))
+            C = self._uvxz(i, k, um, vm)
+            pieces, walls = [], []
+            for n, (pt, r) in enumerate(ring):
+                nxt = ring[(n + 1) % len(ring)][0]
+                pieces.append({"reg": r, "poly": [C, pt, nxt], "visual": True, "collide": True})
+                prev = ring[n - 1][1]
+                if prev.hkey != r.hkey:
+                    ref = ((pt[2] + nxt[2]) / 2, (pt[3] + nxt[3]) / 2)
+                    walls.append((C[2:], pt[2:], {0: prev, 1: r}, ref, 1))
             return pieces, walls
         if len(keys) == 1:
             return [{"reg": R4[0], "poly": quad, "visual": True, "collide": True}], []
@@ -762,20 +752,11 @@ class Grid:
 
     def _region_floor(self, i, k, c, ns_fn, wall_mat_default):
         """Floor (and cut walls) of a cell with a region function."""
-        a = self.a
         P = [self.corner(i, k), self.corner(i + 1, k), self.corner(i + 1, k + 1), self.corner(i, k + 1)]
         pieces, walls = self._cell_pieces(i, k, c)
         for pc in pieces:
-            reg = pc["reg"]
-            surf = self._surf(c, reg) if pc["collide"] else None
-            if "tris" in pc:
-                w = a.level.mats[reg.mat].world
-                for t in pc["tris"]:
-                    ns = tuple(ns_fn(q[0], q[2]) for q in t) if ns_fn else None
-                    a.tri(reg.mat if pc["visual"] else None, *t, tuple((q[0] / w, q[2] / w) for q in t), (0, 1, 0),
-                          1.0, surf, normals=ns)
-            else:
-                self._emit_floor_poly(c, pc["poly"], reg, surf, ns_fn, visual=pc["visual"])
+            surf = self._surf(c, pc["reg"]) if pc["collide"] else None
+            self._emit_floor_poly(c, pc["poly"], pc["reg"], surf, ns_fn, visual=pc["visual"])
         for p, q, regs, ref, ref_side in walls:
             self._cut_wall(c, P, p, q, regs, ref, ref_side, wall_mat_default)
 
