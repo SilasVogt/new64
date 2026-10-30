@@ -20,3 +20,4 @@
 #include "levels/ffj/areas/3/macro.inc.c"
 #include "levels/ffj/lundi/model.inc.c"
 #include "levels/ffj/steam/model.inc.c"
+#include "levels/ffj/scroll.inc.c"

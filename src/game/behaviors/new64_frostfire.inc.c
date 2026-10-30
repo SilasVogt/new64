@@ -39,11 +39,12 @@ static struct ObjectHitbox sLundiHitbox = {
 
 static Vec3f sLundiStarPos = FFJ_LUNDI_STAR_POS;
 
+// Wing poses (see ffj_lundi_geo): up, half up, level, half down, down and back.
 static void lundi_flap(s32 speed) {
-    static const s8 sFrames[] = { 1, 2, 3, 2 };
-    s32 before = (o->oLundiFlapTimer / 8) & 3;
+    static const s8 sFrames[] = { 1, 4, 2, 5, 3, 5, 2, 4 };
+    s32 before = (o->oLundiFlapTimer / 4) & 7;
     o->oLundiFlapTimer += speed;
-    s32 after = (o->oLundiFlapTimer / 8) & 3;
+    s32 after = (o->oLundiFlapTimer / 4) & 7;
     o->oAnimState = sFrames[after];
     if (before != after && after == 0) {
         cur_obj_play_sound_2(SOUND_OBJ_UNKNOWN6);
