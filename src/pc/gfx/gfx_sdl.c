@@ -43,6 +43,8 @@
 #include "pc/utils/misc.h"
 #include "pc/mods/mod_import.h"
 #include "pc/rom_checker.h"
+#include "game/level_update.h"
+#include "game/area.h"
 
 #ifndef GL_MAX_SAMPLES
 #define GL_MAX_SAMPLES 0x8D57
@@ -342,6 +344,15 @@ static void gfx_sdl_dev_screenshot(void) {
         fclose(f);
     }
     free(px);
+
+    // Index line so test scripts can tell which frame shows what
+    snprintf(path, sizeof(path), "%s/index.txt", dir);
+    f = fopen(path, "a");
+    if (f != NULL) {
+        struct MarioState *m = &gMarioStates[0];
+        fprintf(f, "%06u %d %.0f %.0f %.0f\n", frame, gCurrLevelNum, m->pos[0], m->pos[1], m->pos[2]);
+        fclose(f);
+    }
 }
 
 static void gfx_sdl_swap_buffers_begin(void) {
