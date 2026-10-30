@@ -72,3 +72,6 @@ const u8* seg2_act_name_table_original[] = {
 
 #include "dialog_assets.inc.c"
 #include "courses_assets.inc.c"
+#if __has_include("new64_courses.inc.c")
+#include "new64_courses.inc.c" // new64: course 16 text
+#endif

@@ -1,0 +1,13 @@
+# Sky Garden Isles (new64 custom course 16)
+short-name: sgi
+full-name: Sky Garden Isles
+texture-file: []
+area-count: 1
+objects: []
+shared-path: []
+# loaded files
+skybox-bin: cloud_floor
+texture-bin: generic
+effects: false
+actor-bins: [group3, group14]
+common-bin: [common0]

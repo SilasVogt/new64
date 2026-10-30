@@ -1,5 +1,6 @@
 #include "socket.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include "pc/configfile.h"
 #include "pc/debuglog.h"
 #include "pc/djui/djui.h"
@@ -87,6 +88,9 @@ static int socket_bind(SOCKET socket, unsigned int port) {
     rxAddr.sin6_family = AF_INET6;
     rxAddr.sin6_port = htons(port);
     rxAddr.sin6_addr = in6addr_any;
+    // new64: NEW64_BIND_LOCALHOST keeps the host on loopback (play.sh single
+    // player and automated tests), so nothing listens on the network.
+    if (getenv("NEW64_BIND_LOCALHOST") != NULL) { rxAddr.sin6_addr = in6addr_loopback; }
 
     int rc = bind(socket, (SOCKADDR *)&rxAddr, sizeof(rxAddr));
 

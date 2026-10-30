@@ -133,9 +133,6 @@ static inline void bswap_menudata(struct MainMenuSaveData *data) {
  * Byteswap all multibyte fields in a SaveFile.
  */
 static inline void bswap_savefile(struct SaveFile *data) {
-    data->capPos[0] = BSWAP16(data->capPos[0]);
-    data->capPos[1] = BSWAP16(data->capPos[1]);
-    data->capPos[2] = BSWAP16(data->capPos[2]);
     data->flags = BSWAP32(data->flags);
     bswap_signature(&data->signature);
 }
@@ -300,9 +297,11 @@ UNUSED static void wipe_main_menu_data(void) {
     bzero(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]));
 
     // Set score ages for all courses to 3, 2, 1, and 0, respectively.
-    gSaveBuffer.menuData[0].coinScoreAges[0] = 0x3FFFFFFF;
-    gSaveBuffer.menuData[0].coinScoreAges[1] = 0x2AAAAAAA;
-    gSaveBuffer.menuData[0].coinScoreAges[2] = 0x15555555;
+    // new64: 16 courses x 2 bits fill the whole u32.
+    STATIC_ASSERT(COURSE_STAGES_COUNT * 2 <= 32, "coin score ages must fit in a u32");
+    gSaveBuffer.menuData[0].coinScoreAges[0] = 0xFFFFFFFF;
+    gSaveBuffer.menuData[0].coinScoreAges[1] = 0xAAAAAAAA;
+    gSaveBuffer.menuData[0].coinScoreAges[2] = 0x55555555;
 
     gMainMenuDataModified = TRUE;
     save_main_menu_data();
@@ -315,10 +314,11 @@ static s32 get_coin_score_age(s32 fileIndex, s32 courseIndex) {
 
 static void set_coin_score_age(s32 fileIndex, s32 courseIndex, s32 age) {
     if (INVALID_FILE_INDEX(fileIndex)) { return; }
-    s32 mask = 0x3 << (2 * courseIndex);
+    // unsigned: course 16 shifts into the top bits
+    u32 mask = 0x3u << (2 * courseIndex);
 
     gSaveBuffer.menuData[0].coinScoreAges[fileIndex] &= ~mask;
-    gSaveBuffer.menuData[0].coinScoreAges[fileIndex] |= age << (2 * courseIndex);
+    gSaveBuffer.menuData[0].coinScoreAges[fileIndex] |= ((u32) age & 0x3u) << (2 * courseIndex);
 }
 
 /**
@@ -350,7 +350,7 @@ static void touch_high_score_ages(s32 fileIndex) {
     if (INVALID_FILE_INDEX(fileIndex)) { return; }
     s32 i;
 
-    for (i = 0; i < 15; i++) {
+    for (i = 0; i < COURSE_STAGES_COUNT; i++) {
         touch_coin_score_age(fileIndex, i);
     }
 }
@@ -782,6 +782,9 @@ void save_file_set_cannon_unlocked(void) {
     network_send_save_set_flag(gCurrSaveFileNum - 1, gCurrCourseNum, 0x80, SAVE_FLAG_FILE_EXISTS);
 }
 
+// new64: cap position lives in RAM only, see struct SaveFile.
+static Vec3s sCapPos[NUM_SAVE_FILES] = { 0 };
+
 void save_file_set_cap_pos(s16 x, s16 y, s16 z) {
     if (INVALID_FILE_INDEX(gCurrSaveFileNum - 1)) { return; }
     if (INVALID_SRC_SLOT(gSaveFileUsingBackupSlot)) { return; }
@@ -789,7 +792,7 @@ void save_file_set_cap_pos(s16 x, s16 y, s16 z) {
 
     saveFile->capLevel = gCurrLevelNum;
     saveFile->capArea = gCurrAreaIndex;
-    vec3s_set(saveFile->capPos, x, y, z);
+    vec3s_set(sCapPos[gCurrSaveFileNum - 1], x, y, z);
     save_file_set_flags(SAVE_FLAG_CAP_ON_GROUND);
 }
 
@@ -801,7 +804,7 @@ s32 save_file_get_cap_pos(VEC_OUT Vec3s capPos) {
 
     if (saveFile->capLevel == gCurrLevelNum && saveFile->capArea == gCurrAreaIndex
         && (flags & SAVE_FLAG_CAP_ON_GROUND)) {
-        vec3s_copy(capPos, saveFile->capPos);
+        vec3s_copy(capPos, sCapPos[gCurrSaveFileNum - 1]);
         return TRUE;
     }
     return FALSE;

@@ -179,6 +179,10 @@ void get_version_remote(void) {
 }
 
 void check_for_updates(void) {
+    // new64: this is a fork with its own course and save layout. Upstream
+    // coopdx updates would replace it, so never offer them.
+    return;
+
     LOADING_SCREEN_MUTEX(loading_screen_set_segment_text("Checking For Updates"));
 
     get_version_remote();

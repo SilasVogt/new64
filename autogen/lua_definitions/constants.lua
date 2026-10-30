@@ -118,31 +118,33 @@ COURSE_TTC      = 14
 --- @type integer
 COURSE_RR       = 15
 --- @type integer
-COURSE_BITDW    = 16
+COURSE_SGI      = 16
 --- @type integer
-COURSE_BITFS    = 17
+COURSE_BITDW    = 17
 --- @type integer
-COURSE_BITS     = 18
+COURSE_BITFS    = 18
 --- @type integer
-COURSE_PSS      = 19
+COURSE_BITS     = 19
 --- @type integer
-COURSE_COTMC    = 20
+COURSE_PSS      = 20
 --- @type integer
-COURSE_TOTWC    = 21
+COURSE_COTMC    = 21
 --- @type integer
-COURSE_VCUTM    = 22
+COURSE_TOTWC    = 22
 --- @type integer
-COURSE_WMOTR    = 23
+COURSE_VCUTM    = 23
 --- @type integer
-COURSE_SA       = 24
+COURSE_WMOTR    = 24
 --- @type integer
-COURSE_CAKE_END = 25
+COURSE_SA       = 25
 --- @type integer
-COURSE_END = 26
+COURSE_CAKE_END = 26
 --- @type integer
-COURSE_MAX = 25
+COURSE_END = 27
 --- @type integer
-COURSE_COUNT = 25
+COURSE_MAX = 26
+--- @type integer
+COURSE_COUNT = 26
 --- @type integer
 COURSE_MIN = 1
 
@@ -3478,7 +3480,7 @@ LEVEL_WMOTR            = 31 --- @type LevelNum
 LEVEL_UNKNOWN_32       = 32 --- @type LevelNum
 LEVEL_BOWSER_2         = 33 --- @type LevelNum
 LEVEL_BOWSER_3         = 34 --- @type LevelNum
-LEVEL_UNKNOWN_35       = 35 --- @type LevelNum
+LEVEL_SGI              = 35 --- @type LevelNum
 LEVEL_TTM              = 36 --- @type LevelNum
 LEVEL_UNKNOWN_37       = 37 --- @type LevelNum
 LEVEL_UNKNOWN_38       = 38 --- @type LevelNum
@@ -3520,7 +3522,7 @@ LEVEL_COUNT            = 39 --- @type LevelNum
 --- | `LEVEL_UNKNOWN_32`
 --- | `LEVEL_BOWSER_2`
 --- | `LEVEL_BOWSER_3`
---- | `LEVEL_UNKNOWN_35`
+--- | `LEVEL_SGI`
 --- | `LEVEL_TTM`
 --- | `LEVEL_UNKNOWN_37`
 --- | `LEVEL_UNKNOWN_38`

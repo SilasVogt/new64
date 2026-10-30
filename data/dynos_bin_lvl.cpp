@@ -74,7 +74,7 @@ s64 DynOS_Lvl_ParseLevelScriptConstants(const String& _Arg, bool* found) {
     lvl_constant(LEVEL_UNKNOWN_32);
     lvl_constant(LEVEL_BOWSER_2);
     lvl_constant(LEVEL_BOWSER_3);
-    lvl_constant(LEVEL_UNKNOWN_35);
+    lvl_constant(LEVEL_SGI);
     lvl_constant(LEVEL_TTM);
     lvl_constant(LEVEL_UNKNOWN_37);
     lvl_constant(LEVEL_UNKNOWN_38);

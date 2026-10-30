@@ -1,3 +1,8 @@
+#include "levels/sgi/layout.h"
+
+// new64: in Sky Garden Isles the star appears above the sky arena.
+static Vec3f sSgiKingStarPos = SGI_KING_STAR_POS;
+
 // king_bobomb.c.inc
 
 struct MarioState* king_bobomb_nearest_mario_state(void) {
@@ -243,12 +248,14 @@ void king_bobomb_act_8(void) {
         o->oPosY += 200.0f + gDebugInfo[5][0];
 
         f32* starPos = gLevelValues.starPositions.KingBobombStarPos;
+        if (gCurrLevelNum == LEVEL_SGI) { starPos = sSgiKingStarPos; } // new64
         star = spawn_default_star(starPos[0], starPos[1], starPos[2]);
 
         o->oPosY = objectPosY;
 #else
         o->oPosY += 100.0f;
         f32* starPos = gLevelValues.starPositions.KingBobombStarPos;
+        if (gCurrLevelNum == LEVEL_SGI) { starPos = sSgiKingStarPos; } // new64
         star = spawn_default_star(starPos[0], starPos[1], starPos[2]);
 #endif
         // If we're not the closet to King-Bombomb,
