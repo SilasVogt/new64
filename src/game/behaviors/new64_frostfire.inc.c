@@ -9,6 +9,7 @@
 // behParams: byte 1 = phase offset in frames, byte 2 = launch speed.
 
 #include "levels/ffj/layout.h"
+#include "pc/lua/utils/smlua_obj_utils.h"
 
 // Defined in obj_behaviors_2.c without a header declaration.
 void obj_die_if_health_non_positive(void);
@@ -175,9 +176,21 @@ static void lundi_act_climb(void) {
     }
 }
 
+// Other puffins still flying. Objects marked for deletion this frame are
+// skipped, so two puffins defeated on the same frame still reveal the star.
+static s32 lundi_count_others_alive(void) {
+    s32 count = 0;
+    struct Object *obj = obj_get_first_with_behavior_id(id_bhvNew64Lundi);
+    while (obj != NULL) {
+        if (obj != o && obj->activeFlags != ACTIVE_FLAG_DEACTIVATED) { count++; }
+        obj = obj_get_next_with_same_behavior_id(obj);
+    }
+    return count;
+}
+
 static void lundi_defeated(void) {
     // The last puffin standing reveals the star.
-    if (count_objects_with_behavior(bhvNew64Lundi) <= 1) {
+    if (lundi_count_others_alive() == 0) {
         spawn_default_star(sLundiStarPos[0], sLundiStarPos[1], sLundiStarPos[2]);
     }
     spawn_mist_particles_variable(0, 0, 46.0f);
@@ -194,6 +207,16 @@ void bhv_new64_lundi_init(void) {
 }
 
 void bhv_new64_lundi_loop(void) {
+    // Share flight and defeats with other players, like the vanilla flyers.
+    if (!sync_object_is_initialized(o->oSyncID)) {
+        sync_object_init(o, 6000.0f);
+        sync_object_init_field(o, o->oLundiOrbitAngle);
+        sync_object_init_field(o, o->oLundiCruiseY);
+        sync_object_init_field(o, o->oLundiDiveTimer);
+        sync_object_init_field(o, o->oFaceAnglePitch);
+        sync_object_init_field(o, o->oFaceAngleRoll);
+    }
+
     switch (o->oAction) {
         case LUNDI_ACT_PERCH:  lundi_act_perch();  break;
         case LUNDI_ACT_CIRCLE: lundi_act_circle(); break;
