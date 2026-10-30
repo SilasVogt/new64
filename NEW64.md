@@ -175,6 +175,10 @@ scroll: the generator writes `levels/ffj/scroll.inc.c`, and
 `geo_ffj_scroll_textures` in `levels/ffj/geo.c` moves those textures every
 frame.
 
+`gen_ffj.py` also floods each cave from its entrance and stops with an error
+if any coin, star or enemy sits where Mario cannot walk to (a step up of more
+than 330 units counts as a wall).
+
 ## Tests
 
 The Lua test mods in `tools/new64/testmods/` drive the game through
