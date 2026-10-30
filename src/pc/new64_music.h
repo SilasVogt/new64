@@ -21,8 +21,13 @@ bool new64_music_override(u8 seqId, s32 *bankId, void **seqData);
 // With the "custom course music" setting off, our ids play vanilla songs.
 u8 new64_music_remap(u8 seqId);
 
-// Restart the level music after the setting changes.
+// Restart the level music after the setting changes. While the pause menu
+// has the music muted, the switch waits until the game is unpaused.
 void new64_music_refresh(void);
+void new64_music_apply_pending(void);
+
+// Sequence ids reserved for the songs above.
+bool new64_music_is_reserved(u8 seqId);
 #endif
 
 #endif

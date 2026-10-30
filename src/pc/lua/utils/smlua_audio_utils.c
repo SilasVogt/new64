@@ -172,6 +172,7 @@ void smlua_audio_utils_replace_sequence(u8 sequenceId, u8 bankId, u8 defaultVolu
 
 u8 smlua_audio_utils_allocate_sequence(void) {
     for (u8 seqId = SEQ_COUNT + 1; seqId < MAX_AUDIO_OVERRIDE; seqId++) {
+        if (new64_music_is_reserved(seqId)) { continue; } // new64: built-in course music
         if (!sAudioOverrides[seqId].enabled) {
             return seqId;
         }

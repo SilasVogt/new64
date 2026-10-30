@@ -2,6 +2,7 @@
 #include "seq_ids.h"
 #include "audio/external.h"
 #include "pc/configfile.h"
+#include "game/sound_init.h"
 
 struct New64Song {
     u8 seqId;
@@ -55,10 +56,31 @@ u8 new64_music_remap(u8 seqId) {
     return seqId;
 }
 
-void new64_music_refresh(void) {
+bool new64_music_is_reserved(u8 seqId) {
+    return new64_music_is_ours(seqId);
+}
+
+static bool sNew64RefreshPending = false;
+
+static void new64_music_restart(void) {
     u16 current = get_current_background_music();
     if (current == 0xFFFF || !new64_music_is_ours(current & 0xFF)) { return; }
     // Re-queue the same id; the loader picks the custom or vanilla song.
     stop_background_music(current);
     play_music(SEQ_PLAYER_LEVEL, current, 0);
+}
+
+void new64_music_refresh(void) {
+    // Restarting a sequence clears the pause mute, so wait for unpause.
+    if (background_noise_is_muted()) {
+        sNew64RefreshPending = true;
+        return;
+    }
+    new64_music_restart();
+}
+
+void new64_music_apply_pending(void) {
+    if (!sNew64RefreshPending) { return; }
+    sNew64RefreshPending = false;
+    new64_music_restart();
 }

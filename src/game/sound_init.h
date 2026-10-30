@@ -22,6 +22,7 @@
 void reset_volume(void);
 /* |description|Raises music volume back up to normal levels|descriptionEnd| */
 void raise_background_noise(s32 a);
+bool background_noise_is_muted(void);
 /* |description|Lowers the volume of music by 40%|descriptionEnd| */
 void lower_background_noise(s32 a);
 /* |description|Disables background soundbanks|descriptionEnd| */
