@@ -933,7 +933,7 @@ FLOE = (0, -1300, 1000, 300)
 HALL3 = (0, -1300, 3900)
 TUBE = ((0, 5100), (0, 2400), 480)
 STONES3 = [(0, 1900, 40), (60, 1450, 110), (-40, 1000, 170), (40, 560, 240), (0, 150, 300)]
-ISLANDS3 = [(-2300, -2200, 600, 120), (2300, -2400, 650, 160), (2400, 300, 450, 80)]
+ISLANDS3 = [(-2300, -2200, 600, 120), (2300, -2400, 650, 160), (2300, 250, 450, 80)]
 
 
 LAVA_COLUMNS = [(-1800, -2900), (1450, -3350), (-2650, 650)]
@@ -943,7 +943,8 @@ def info3(x, z):
     """(ceiling, kind, island) of the lava tube and magma hall, or None in rock."""
     r = math.dist((x, z), HALL3[:2])
     d, t = caps(x, z, *TUBE[0], *TUBE[1])
-    stream = abs(x + 30 * N1.fbm(z / 500, 1.7, 2)) < 130 and z < 4300
+    # The lava stream runs down the tube and spills over the rim into the lake
+    stream = abs(x + 30 * N1.fbm(z / 500, 1.7, 2)) < 130 and 1500 < z < 4300
     best = None
     if d < TUBE[2]:
         best = (820 - 220 * (d / TUBE[2]) ** 2, "stream" if stream else "tube", None)
@@ -956,7 +957,7 @@ def info3(x, z):
             best = (ce, "floe", None)
         else:
             for n, (sx, sz, sr, top) in enumerate(ISLANDS3):
-                if math.dist((x, z), (sx, sz)) < sr * (1 + 0.14 * N1.fbm(x / 350, z / 350, 2)):
+                if math.dist((x, z), (sx, sz)) < sr * (1 + 0.1 * N1.fbm(x / 350, z / 350, 2)):
                     return (ce, "island", n)
             if best is None:
                 best = (ce, "magma", None)

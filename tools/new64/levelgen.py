@@ -411,6 +411,35 @@ def _clip(poly, side):
     return out if len(out) >= 3 else []
 
 
+def _inside(poly, u, v, eps=1e-9):
+    """Is (u, v) inside or on a convex (u, v, x, z) polygon (either winding)?"""
+    sign = 0
+    for j in range(len(poly)):
+        p, q = poly[j], poly[(j + 1) % len(poly)]
+        cr = (q[0] - p[0]) * (v - p[1]) - (q[1] - p[1]) * (u - p[0])
+        if abs(cr) <= eps:
+            continue
+        if sign == 0:
+            sign = 1 if cr > 0 else -1
+        elif (cr > 0) != (sign > 0):
+            return False
+    return True
+
+
+def _tri_height(t, x, z, eps=1e-6):
+    """Height of triangle t ((x, y, z) x3) at (x, z), or None if outside."""
+    (ax, ay, az), (bx, by, bz), (cx, cy, cz) = t
+    d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz)
+    if abs(d) < 1e-9:
+        return None
+    wa = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d
+    wb = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d
+    wc = 1 - wa - wb
+    if min(wa, wb, wc) < -eps:
+        return None
+    return wa * ay + wb * by + wc * cy
+
+
 class Grid:
     """2.5D grid for terrain and caves.
 
@@ -469,7 +498,9 @@ class Grid:
         return f[2] + (f[3] - f[2]) * (1 - u) + (f[1] - f[2]) * (1 - v)
 
     def height_at(self, x, z, default=None):
-        """Floor height under (x, z) as built (region aware)."""
+        """Floor height under (x, z) as built: region cells are looked up in
+        the same pieces the floor is made of, so objects placed with this sit
+        on the mesh even right at a lava bank."""
         i, k = int((x - self.x0) // self.cell), int((z - self.z0) // self.cell)
         c = self.cells.get((i, k))
         if c is None:
@@ -478,6 +509,18 @@ class Grid:
         fn = c.get("region")
         if fn is None:
             return self._plane(c["floor"], u, v)
+        pieces, _ = self._cell_pieces(i, k, c)
+        for pc in pieces:
+            if not pc["visual"]:
+                continue
+            if "tris" in pc:
+                for t in pc["tris"]:
+                    y = _tri_height(t, x, z)
+                    if y is not None:
+                        return y
+            elif _inside(pc["poly"], u, v):
+                r = pc["reg"]
+                return r.level if r.level is not None else self._plane(c["floor"], u, v) - r.drop
         r = fn(x, z)
         return r.level if r.level is not None else self._plane(c["floor"], u, v) - r.drop
 
@@ -504,55 +547,142 @@ class Grid:
             self.xcache[key] = hit
         return hit
 
-    def _split(self, i, k, c, keyf):
-        """Marching squares: returns (polys, cuts). polys = [(side, [(u, v, x, z)...])],
-        cuts = [(p, q, ref, ref_side)] in (x, z), where ref is a point on the
-        ref_side of that cut; side 0 is corner 0's class."""
-        R = c["regions"]
+    def _sub_crossing(self, pa, pb, fn, keyf):
+        """Like _crossing, between any two points (inside a subdivided cell)."""
+        ka, kb = (round(pa[0], 3), round(pa[1], 3)), (round(pb[0], 3), round(pb[1], 3))
+        if kb < ka:
+            pa, pb, ka, kb = pb, pa, kb, ka
+        key = (ka, kb, keyf.__name__, id(fn))
+        hit = self.xcache.get(key)
+        if hit is None:
+            k0 = keyf(fn(*pa))
+            lo, hi = 0.0, 1.0
+            for _ in range(11):
+                m = (lo + hi) / 2
+                if keyf(fn(pa[0] + (pb[0] - pa[0]) * m, pa[1] + (pb[1] - pa[1]) * m)) == k0:
+                    lo = m
+                else:
+                    hi = m
+            t = (lo + hi) / 2
+            hit = (pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t)
+            self.xcache[key] = hit
+        return hit
+
+    def _uvxz(self, i, k, u, v):
+        x0, z0 = self.corner(i, k)
+        return (u, v, x0 + u * self.cell, z0 + v * self.cell)
+
+    def _split(self, i, k, c, sq, R4, keyf):
+        """Marching squares over one square of a cell (sq = (u0, v0, u1, v1),
+        the whole cell or a part of it) with corner regions R4. Returns
+        (polys, cuts): polys = [(side, [(u, v, x, z)...])], cuts = [(p, q, ref,
+        ref_side)] in (x, z), ref being a point on side ref_side of the cut.
+        Side 0 is the class of the square's first corner."""
+        u0, v0, u1, v1 = sq
         cs = self.cell
+        x0, z0 = self.corner(i, k)
+        V = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1), self._uvxz(i, k, u0, v1)]
+        whole = sq == (0.0, 0.0, 1.0, 1.0)
         ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
-        P = [self.corner(*q) for q in ids]
-        UV = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
-        k0 = keyf(R[0])
-        s = [0 if keyf(r) == k0 else 1 for r in R]
+        k0 = keyf(R4[0])
+        s = [0 if keyf(r) == k0 else 1 for r in R4]
         fn = c["region"]
-
-        def V(j):
-            return (UV[j][0], UV[j][1], P[j][0], P[j][1])
-
         X = {}
         for j in range(4):
             jn = (j + 1) % 4
             if s[j] != s[jn]:
-                x, z = self._crossing(ids[j], ids[jn], fn, keyf)
-                X[j] = ((x - P[0][0]) / cs, (z - P[0][1]) / cs, x, z)
+                if whole:
+                    x, z = self._crossing(ids[j], ids[jn], fn, keyf)
+                else:
+                    x, z = self._sub_crossing(V[j][2:], V[jn][2:], fn, keyf)
+                X[j] = ((x - x0) / cs, (z - z0) / cs, x, z)
         saddle = s[0] == s[2] and s[1] == s[3] and s[0] != s[1]
         if not saddle:
             polys = {0: [], 1: []}
             for j in range(4):
-                polys[s[j]].append(V(j))
+                polys[s[j]].append(V[j])
                 if j in X:
                     polys[0].append(X[j])
                     polys[1].append(X[j])
             a, b = [X[j] for j in sorted(X)]
-            return [(0, polys[0]), (1, polys[1])], [((a[2], a[3]), (b[2], b[3]), P[0], 0)]
-        cx, cz = P[0][0] + cs / 2, P[0][1] + cs / 2
-        mid = 0 if keyf(fn(cx, cz)) == k0 else 1
-        C = (0.5, 0.5, cx, cz)
+            return [(0, polys[0]), (1, polys[1])], [((a[2], a[3]), (b[2], b[3]), V[0][2:], 0)]
+        C = self._uvxz(i, k, (u0 + u1) / 2, (v0 + v1) / 2)
+        mid = 0 if keyf(fn(C[2], C[3])) == k0 else 1
         polys, cuts = [], []
         ring = []
         for j in range(4):
-            ring += [V(j), X[j]]
+            ring += [V[j], X[j]]
         # The middle's class joins its two corners; the other two are islands
         iso = [1, 3] if s[0] == mid else [0, 2]
         for j in iso:
-            polys.append((s[j], [X[(j - 1) % 4], V(j), X[j]]))
-            cuts.append(((X[(j - 1) % 4][2], X[(j - 1) % 4][3]), (X[j][2], X[j][3]), P[j], s[j]))
+            polys.append((s[j], [X[(j - 1) % 4], V[j], X[j]]))
+            cuts.append(((X[(j - 1) % 4][2], X[(j - 1) % 4][3]), (X[j][2], X[j][3]), V[j][2:], s[j]))
         # The joined class: a hexagon around the centre, fanned from it
-        hexa = [v for v in ring if not (len(v) == 4 and v in [V(j) for j in iso])]
+        hexa = [v for v in ring if v not in [V[j] for j in iso]]
         for n in range(len(hexa)):
             polys.append((mid, [C, hexa[n], hexa[(n + 1) % len(hexa)]]))
         return polys, cuts
+
+    def _surf(self, c, r):
+        s = c.get("surface", r.surface)
+        return self.a.level.mats[r.mat].surface if s == "mat" else s
+
+    def _cell_pieces(self, i, k, c):
+        """The floor of a region cell as pieces plus the walls along its cuts.
+        Cached: building and height_at use the very same pieces."""
+        if "_pieces" not in c:
+            c["_pieces"] = self._square_pieces(c, i, k, (0.0, 0.0, 1.0, 1.0), tuple(c["regions"]), 0)
+        return c["_pieces"]
+
+    def _square_pieces(self, c, i, k, sq, R4, depth):
+        """Pieces of one square: {reg, poly | tris, visual, collide}, and cut
+        walls (p, q, regs, ref, ref_side). Where three height classes meet
+        (a lava stream reaching a lake past its bank) the square is quartered
+        until every part has at most two, so each meeting gets proper walls."""
+        u0, v0, u1, v1 = sq
+        quad = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1),
+                self._uvxz(i, k, u0, v1)]
+        hk = {r.hkey for r in R4}
+        keys = {r.key for r in R4}
+        fn = c["region"]
+        if len(hk) > 2:
+            um, vm = (u0 + u1) / 2, (v0 + v1) / 2
+            if depth < 2:
+                def at(u, v):
+                    q = self._uvxz(i, k, u, v)
+                    return fn(q[2], q[3])
+                rb, rr, rt, rl, rc = at(um, v0), at(u1, vm), at(um, v1), at(u0, vm), at(um, vm)
+                pieces, walls = [], []
+                for sq2, R2 in (((u0, v0, um, vm), (R4[0], rb, rc, rl)), ((um, v0, u1, vm), (rb, R4[1], rr, rc)),
+                                ((um, vm, u1, v1), (rc, rr, R4[2], rt)), ((u0, vm, um, v1), (rl, rc, rt, R4[3]))):
+                    p2, w2 = self._square_pieces(c, i, k, sq2, R2, depth + 1)
+                    pieces += p2
+                    walls += w2
+                return pieces, walls
+            # Still three classes in a tiny square: slope between its corners
+            ys = [r.level if r.level is not None else self._plane(c["floor"], q[0], q[1]) - r.drop
+                  for r, q in zip(R4, quad)]
+            pts = [(q[2], y, q[3]) for q, y in zip(quad, ys)]
+            centre = self._uvxz(i, k, um, vm)
+            return [{"reg": fn(centre[2], centre[3]), "tris": [(pts[0], pts[1], pts[2]), (pts[0], pts[2], pts[3])],
+                     "visual": True, "collide": True}], []
+        if len(keys) == 1:
+            return [{"reg": R4[0], "poly": quad, "visual": True, "collide": True}], []
+        if len(hk) == 1:
+            # Same height, different materials: split the look, keep the
+            # plain square for collision unless the surfaces differ too.
+            polys, _ = self._split(i, k, c, sq, R4, _rkey)
+            regs = self._side_regions(R4, _rkey)
+            if len({self._surf(c, r) for r in R4}) == 1:
+                pieces = [{"reg": regs[sd], "poly": pl, "visual": True, "collide": False} for sd, pl in polys]
+                pieces.append({"reg": R4[0], "poly": quad, "visual": False, "collide": True})
+                return pieces, []
+            return [{"reg": regs[sd], "poly": pl, "visual": True, "collide": True} for sd, pl in polys], []
+        # Two height classes: split, then wall up the cut from the lower side
+        polys, cuts = self._split(i, k, c, sq, R4, _hkey)
+        regs = self._side_regions(R4, _hkey)
+        return ([{"reg": regs[sd], "poly": pl, "visual": True, "collide": True} for sd, pl in polys],
+                [(pp, qq, regs, ref, ref_side) for pp, qq, ref, ref_side in cuts])
 
     def _emit_floor_poly(self, c, poly, reg, surf, ns_fn, visual=True):
         """Fan a convex (u, v, x, z) polygon into floor triangles, cut along
@@ -592,57 +722,20 @@ class Grid:
     def _region_floor(self, i, k, c, ns_fn, wall_mat_default):
         """Floor (and cut walls) of a cell with a region function."""
         a = self.a
-        R = c["regions"]
-        f = c["floor"]
-        eff = c["eff"]
         P = [self.corner(i, k), self.corner(i + 1, k), self.corner(i + 1, k + 1), self.corner(i, k + 1)]
-        cs = self.cell
-        hk = {r.hkey for r in R}
-        keys = {r.key for r in R}
-
-        def surf_of(r):
-            s = c.get("surface", r.surface)
-            return a.level.mats[r.mat].surface if s == "mat" else s
-
-        def whole(reg, surf):
-            quad = [(0.0, 0.0, P[0][0], P[0][1]), (1.0, 0.0, P[1][0], P[1][1]),
-                    (1.0, 1.0, P[2][0], P[2][1]), (0.0, 1.0, P[3][0], P[3][1])]
-            self._emit_floor_poly(c, quad, reg, surf, ns_fn)
-
-        if len(hk) > 2:
-            # Three height classes meet: keep the plain sloped cell
-            reg = c["region"](P[0][0] + cs / 2, P[0][1] + cs / 2)
-            fp = [(P[j][0], eff[j], P[j][1]) for j in range(4)]
-            w = a.level.mats[reg.mat].world
-            uv = [(p[0] / w, p[2] / w) for p in fp]
-            for t in ((0, 1, 2), (0, 2, 3)) if abs(eff[0] - eff[2]) <= abs(eff[1] - eff[3]) else ((0, 1, 3), (1, 2, 3)):
-                ns = tuple(ns_fn(fp[j][0], fp[j][2]) for j in t) if ns_fn else None
-                a.tri(reg.mat, *(fp[j] for j in t), tuple(uv[j] for j in t), (0, 1, 0), 1.0, surf_of(reg), normals=ns)
-            return
-        if len(keys) == 1:
-            whole(R[0], surf_of(R[0]))
-            return
-        if len(hk) == 1:
-            # Same height, different materials: split the look, keep the
-            # plain cell for collision unless the surfaces differ too.
-            polys, _ = self._split(i, k, c, _rkey)
-            regs = self._side_regions(R, _rkey)
-            if len({surf_of(r) for r in R}) == 1:
-                for side, poly in polys:
-                    self._emit_floor_poly(c, poly, regs[side], None, ns_fn)
-                quad = [(0.0, 0.0, P[0][0], P[0][1]), (1.0, 0.0, P[1][0], P[1][1]),
-                        (1.0, 1.0, P[2][0], P[2][1]), (0.0, 1.0, P[3][0], P[3][1])]
-                self._emit_floor_poly(c, quad, R[0], surf_of(R[0]), None, visual=False)
+        pieces, walls = self._cell_pieces(i, k, c)
+        for pc in pieces:
+            reg = pc["reg"]
+            surf = self._surf(c, reg) if pc["collide"] else None
+            if "tris" in pc:
+                w = a.level.mats[reg.mat].world
+                for t in pc["tris"]:
+                    ns = tuple(ns_fn(q[0], q[2]) for q in t) if ns_fn else None
+                    a.tri(reg.mat if pc["visual"] else None, *t, tuple((q[0] / w, q[2] / w) for q in t), (0, 1, 0),
+                          1.0, surf, normals=ns)
             else:
-                for side, poly in polys:
-                    self._emit_floor_poly(c, poly, regs[side], surf_of(regs[side]), ns_fn)
-            return
-        # Two height classes: split, then wall up the cut from the lower side
-        polys, cuts = self._split(i, k, c, _hkey)
-        regs = self._side_regions(R, _hkey)
-        for side, poly in polys:
-            self._emit_floor_poly(c, poly, regs[side], surf_of(regs[side]), ns_fn)
-        for p, q, ref, ref_side in cuts:
+                self._emit_floor_poly(c, pc["poly"], reg, surf, ns_fn, visual=pc["visual"])
+        for p, q, regs, ref, ref_side in walls:
             self._cut_wall(c, P, p, q, regs, ref, ref_side, wall_mat_default)
 
     def _side_regions(self, R, keyf):

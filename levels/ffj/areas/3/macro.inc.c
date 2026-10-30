@@ -10,10 +10,10 @@ const MacroObject ffj_area_3_macro_objs[] = {
     MACRO_OBJECT(/*preset*/ macro_yellow_coin, /*yaw*/ 0, /*pos*/ 0, 340, 150),
     MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ -2500, 120, -2200),
     MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ 2500, 160, -2400),
-    MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ 2600, 80, 300),
+    MACRO_OBJECT(/*preset*/ macro_coin_ring_horizontal, /*yaw*/ 0, /*pos*/ 2500, 80, 250),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 90, /*pos*/ 0, 0, -5000),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 0, /*pos*/ -3300, 0, -1300),
     MACRO_OBJECT(/*preset*/ macro_coin_line_horizontal, /*yaw*/ 0, /*pos*/ 3300, 0, -1300),
-    MACRO_OBJECT(/*preset*/ macro_1up, /*yaw*/ 0, /*pos*/ 2400, 120, 300),
+    MACRO_OBJECT(/*preset*/ macro_1up, /*yaw*/ 0, /*pos*/ 2300, 120, 250),
     MACRO_OBJECT_END(),
 };
