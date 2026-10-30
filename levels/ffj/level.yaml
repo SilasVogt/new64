@@ -1,0 +1,13 @@
+# Frostfire Fjord (new64 custom course 17)
+short-name: ffj
+full-name: Frostfire Fjord
+texture-file: []
+area-count: 3
+objects: [lundi, steam]
+shared-path: []
+# loaded files
+skybox-bin: ccm
+texture-bin: generic
+effects: true
+actor-bins: [group7, group16]
+common-bin: [common0]

@@ -667,7 +667,9 @@
 | id_bhvStarNumber | 538 |
 | id_bhvAmbientLight | 539 |
 | id_bhvPointLight | 540 |
-| id_bhv_max_count | 541 |
+| id_bhvNew64Lundi | 541 |
+| id_bhvNew64Geyser | 542 |
+| id_bhv_max_count | 543 |
 
 [:arrow_up_small:](#)
 
@@ -1574,7 +1576,7 @@
 | LEVEL_BOWSER_3 | 34 |
 | LEVEL_SGI | 35 |
 | LEVEL_TTM | 36 |
-| LEVEL_UNKNOWN_37 | 37 |
+| LEVEL_FFJ | 37 |
 | LEVEL_UNKNOWN_38 | 38 |
 | LEVEL_COUNT | 39 |
 

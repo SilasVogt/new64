@@ -2733,11 +2733,13 @@ void print_save_file_scores(s8 fileIndex) {
     gDPSetEnvColor(gDisplayListHead++, 255, 255, 255, sTextBaseAlpha);
 
 //! Huge print list, for loops exist for a reason!
+// new64: rows are 11 px apart so 17 courses plus castle secrets fit on screen.
+#define SCORE_ROW_HEIGHT 11
 #define PRINT_COURSE_SCORES(courseIndex, pad) \
-    print_menu_generic_string(LEVEL_NAME_X + (pad * LEVEL_NUM_PAD), 23 + 12 * courseIndex, \
+    print_menu_generic_string(LEVEL_NAME_X + (pad * LEVEL_NUM_PAD), 23 + SCORE_ROW_HEIGHT * courseIndex, \
                               segmented_to_virtual(levelNameTable[courseIndex - 1])); \
-    print_score_file_star_score(fileIndex, courseIndex - 1, STAR_SCORE_X, 23 + 12 * courseIndex); \
-    print_score_file_course_coin_score(fileIndex, courseIndex - 1, 213, 23 + 12 * courseIndex);
+    print_score_file_star_score(fileIndex, courseIndex - 1, STAR_SCORE_X, 23 + SCORE_ROW_HEIGHT * courseIndex); \
+    print_score_file_course_coin_score(fileIndex, courseIndex - 1, 213, 23 + SCORE_ROW_HEIGHT * courseIndex);
 
     // Course values are indexed, from Bob-omb Battlefield to Rainbow Ride
     PRINT_COURSE_SCORES(COURSE_BOB, 1)
@@ -2756,14 +2758,15 @@ void print_save_file_scores(s8 fileIndex) {
     PRINT_COURSE_SCORES(COURSE_TTC, 0)
     PRINT_COURSE_SCORES(COURSE_RR,  0)
     PRINT_COURSE_SCORES(COURSE_SGI, 0)
+    PRINT_COURSE_SCORES(COURSE_FFJ, 0)
 
 #undef PRINT_COURSE_SCORES
 
     // Print castle secret stars text
-    print_menu_generic_string(LEVEL_NAME_X + SECRET_STARS_PAD, 23 + 12 * (COURSE_STAGES_COUNT + 1),
+    print_menu_generic_string(LEVEL_NAME_X + SECRET_STARS_PAD, 23 + SCORE_ROW_HEIGHT * (COURSE_STAGES_COUNT + 1),
                               segmented_to_virtual(levelNameTable[COURSE_MAX]));
     // Print castle secret stars score
-    print_score_file_castle_secret_stars(fileIndex, STAR_SCORE_X, 23 + 12 * (COURSE_STAGES_COUNT + 1));
+    print_score_file_castle_secret_stars(fileIndex, STAR_SCORE_X, 23 + SCORE_ROW_HEIGHT * (COURSE_STAGES_COUNT + 1));
 
     // Print current coin score mode
     if (sScoreFileCoinScoreMode == 0) {

@@ -123,6 +123,9 @@ const LevelScript level_castle_grounds_entry[] = {
         // comes back out after a star, a death or leaving the course.
         OBJECT(/*model*/ MODEL_CASTLE_GROUNDS_WARP_PIPE, /*pos*/ -2000, 260, 4100, /*angle*/ 0, 0, 0, /*behParam*/ 0x00200000, /*beh*/ bhvWarpPipe),
         WARP_NODE(/*id*/ 0x20, /*destLevel*/ LEVEL_SGI, /*destArea*/ 0x01, /*destNode*/ 0x0A, /*flags*/ WARP_NO_CHECKPOINT),
+        // new64: warp pipe to course 17, Frostfire Fjord (same idea as above).
+        OBJECT(/*model*/ MODEL_CASTLE_GROUNDS_WARP_PIPE, /*pos*/ -2000, 260, 4750, /*angle*/ 0, 0, 0, /*behParam*/ 0x00210000, /*beh*/ bhvWarpPipe),
+        WARP_NODE(/*id*/ 0x21, /*destLevel*/ LEVEL_FFJ, /*destArea*/ 0x01, /*destNode*/ 0x0A, /*flags*/ WARP_NO_CHECKPOINT),
         JUMP_LINK(script_func_local_1),
         JUMP_LINK(script_func_local_2),
         JUMP_LINK(script_func_local_3),

@@ -120,31 +120,33 @@ COURSE_RR       = 15
 --- @type integer
 COURSE_SGI      = 16
 --- @type integer
-COURSE_BITDW    = 17
+COURSE_FFJ      = 17
 --- @type integer
-COURSE_BITFS    = 18
+COURSE_BITDW    = 18
 --- @type integer
-COURSE_BITS     = 19
+COURSE_BITFS    = 19
 --- @type integer
-COURSE_PSS      = 20
+COURSE_BITS     = 20
 --- @type integer
-COURSE_COTMC    = 21
+COURSE_PSS      = 21
 --- @type integer
-COURSE_TOTWC    = 22
+COURSE_COTMC    = 22
 --- @type integer
-COURSE_VCUTM    = 23
+COURSE_TOTWC    = 23
 --- @type integer
-COURSE_WMOTR    = 24
+COURSE_VCUTM    = 24
 --- @type integer
-COURSE_SA       = 25
+COURSE_WMOTR    = 25
 --- @type integer
-COURSE_CAKE_END = 26
+COURSE_SA       = 26
 --- @type integer
-COURSE_END = 27
+COURSE_CAKE_END = 27
 --- @type integer
-COURSE_MAX = 26
+COURSE_END = 28
 --- @type integer
-COURSE_COUNT = 26
+COURSE_MAX = 27
+--- @type integer
+COURSE_COUNT = 27
 --- @type integer
 COURSE_MIN = 1
 
@@ -1164,7 +1166,9 @@ id_bhvBlueCoinNumber                      = 537 --- @type BehaviorId
 id_bhvStarNumber                          = 538 --- @type BehaviorId
 id_bhvAmbientLight                        = 539 --- @type BehaviorId
 id_bhvPointLight                          = 540 --- @type BehaviorId
-id_bhv_max_count                          = 541 --- @type BehaviorId
+id_bhvNew64Lundi                          = 541 --- @type BehaviorId
+id_bhvNew64Geyser                         = 542 --- @type BehaviorId
+id_bhv_max_count                          = 543 --- @type BehaviorId
 
 --- @alias BehaviorId
 --- | `id_bhv1Up`
@@ -1708,6 +1712,8 @@ id_bhv_max_count                          = 541 --- @type BehaviorId
 --- | `id_bhvStarNumber`
 --- | `id_bhvAmbientLight`
 --- | `id_bhvPointLight`
+--- | `id_bhvNew64Lundi`
+--- | `id_bhvNew64Geyser`
 --- | `id_bhv_max_count`
 
 RCO_ALL                       = 0 --- @type RomhackCameraOverride
@@ -3482,7 +3488,7 @@ LEVEL_BOWSER_2         = 33 --- @type LevelNum
 LEVEL_BOWSER_3         = 34 --- @type LevelNum
 LEVEL_SGI              = 35 --- @type LevelNum
 LEVEL_TTM              = 36 --- @type LevelNum
-LEVEL_UNKNOWN_37       = 37 --- @type LevelNum
+LEVEL_FFJ              = 37 --- @type LevelNum
 LEVEL_UNKNOWN_38       = 38 --- @type LevelNum
 LEVEL_COUNT            = 39 --- @type LevelNum
 
@@ -3524,7 +3530,7 @@ LEVEL_COUNT            = 39 --- @type LevelNum
 --- | `LEVEL_BOWSER_3`
 --- | `LEVEL_SGI`
 --- | `LEVEL_TTM`
---- | `LEVEL_UNKNOWN_37`
+--- | `LEVEL_FFJ`
 --- | `LEVEL_UNKNOWN_38`
 --- | `LEVEL_COUNT`
 

@@ -60,8 +60,11 @@ struct MainMenuSaveData
 #define SUBTRAHEND 6
 #endif
 
+    // new64: 2-bit ages for courses 17+ (the u32s above hold 16 courses).
+    u8 coinScoreAgesHi[NUM_SAVE_FILES];
+
     // Pad to match the EEPROM size of 0x200 (10 bytes on JP/US, 8 bytes on EU)
-    u8 filler[EEPROM_SIZE / 2 - SUBTRAHEND - NUM_SAVE_FILES * (4 + sizeof(struct SaveFile))];
+    u8 filler[EEPROM_SIZE / 2 - SUBTRAHEND - NUM_SAVE_FILES * (5 + sizeof(struct SaveFile))];
 
     struct SaveBlockSignature signature;
 };

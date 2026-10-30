@@ -1,3 +1,8 @@
+#include "levels/ffj/layout.h"
+
+// new64: Big Chill Bully star above the ice floe in Frostfire Fjord.
+static Vec3f sFfjChillStarPos = FFJ_CHILL_STAR_POS;
+
 // bully.c.inc
 
 static struct ObjectHitbox sSmallBullyHitbox = {
@@ -242,7 +247,14 @@ void bully_step(void) {
     obj_check_floor_death(collisionFlags, sObjFloor);
 
     if (o->oBullySubtype & BULLY_STYPE_CHILL) {
-        if (o->oPosY < gBehaviorValues.ChillBullyDeathPosY) {
+        // new64: in Frostfire Fjord only the magma hall (area 3) has a fall
+        // height; the ice cave sits below Snowman's Land's 1030, and lava
+        // floors still kill chill bullies everywhere through floor death.
+        f32 deathY = gBehaviorValues.ChillBullyDeathPosY;
+        if (gCurrLevelNum == LEVEL_FFJ) {
+            deathY = (gCurrAreaIndex == 3) ? FFJ_CHILL_BULLY_DEATH_Y : -20000.0f;
+        }
+        if (o->oPosY < deathY) {
             o->oAction = BULLY_ACT_LAVA_DEATH;
         }
     }
@@ -275,6 +287,7 @@ void bully_act_level_death(void) {
 
             if (o->oBullySubtype == BULLY_STYPE_CHILL) {
                 f32* starPos = gLevelValues.starPositions.ChillBullyStarPos;
+                if (gCurrLevelNum == LEVEL_FFJ) { starPos = sFfjChillStarPos; } // new64
                 spawn_networked_default_star(starPos[0], starPos[1], starPos[2], o->oBullyLastNetworkPlayerIndex);
             } else {
                 f32* starPos = gLevelValues.starPositions.BigBullyTrioStarPos;
