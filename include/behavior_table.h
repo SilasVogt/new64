@@ -545,6 +545,8 @@ enum BehaviorId {
     id_bhvStarNumber,
     id_bhvAmbientLight,
     id_bhvPointLight,
+    id_bhvNew64Lundi,
+    id_bhvNew64Geyser,
 
     id_bhv_max_count // must be the last in the list
 };

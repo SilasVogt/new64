@@ -297,11 +297,14 @@ UNUSED static void wipe_main_menu_data(void) {
     bzero(&gSaveBuffer.menuData[0], sizeof(gSaveBuffer.menuData[0]));
 
     // Set score ages for all courses to 3, 2, 1, and 0, respectively.
-    // new64: 16 courses x 2 bits fill the whole u32.
-    STATIC_ASSERT(COURSE_STAGES_COUNT * 2 <= 32, "coin score ages must fit in a u32");
+    // new64: courses 1-16 fill the u32s, 17+ live in coinScoreAgesHi.
+    STATIC_ASSERT(COURSE_STAGES_COUNT * 2 <= 32 + 8, "coin score ages must fit");
     gSaveBuffer.menuData[0].coinScoreAges[0] = 0xFFFFFFFF;
     gSaveBuffer.menuData[0].coinScoreAges[1] = 0xAAAAAAAA;
     gSaveBuffer.menuData[0].coinScoreAges[2] = 0x55555555;
+    gSaveBuffer.menuData[0].coinScoreAgesHi[0] = 0xFF;
+    gSaveBuffer.menuData[0].coinScoreAgesHi[1] = 0xAA;
+    gSaveBuffer.menuData[0].coinScoreAgesHi[2] = 0x55;
 
     gMainMenuDataModified = TRUE;
     save_main_menu_data();
@@ -309,11 +312,20 @@ UNUSED static void wipe_main_menu_data(void) {
 
 static s32 get_coin_score_age(s32 fileIndex, s32 courseIndex) {
     if (INVALID_FILE_INDEX(fileIndex)) { return 0; }
+    if (courseIndex >= 16) {
+        return (gSaveBuffer.menuData[0].coinScoreAgesHi[fileIndex] >> (2 * (courseIndex - 16))) & 0x3;
+    }
     return (gSaveBuffer.menuData[0].coinScoreAges[fileIndex] >> (2 * courseIndex)) & 0x3;
 }
 
 static void set_coin_score_age(s32 fileIndex, s32 courseIndex, s32 age) {
     if (INVALID_FILE_INDEX(fileIndex)) { return; }
+    if (courseIndex >= 16) {
+        u8 maskHi = (u8)(0x3u << (2 * (courseIndex - 16)));
+        gSaveBuffer.menuData[0].coinScoreAgesHi[fileIndex] &= (u8) ~maskHi;
+        gSaveBuffer.menuData[0].coinScoreAgesHi[fileIndex] |= (u8)(((u32) age & 0x3u) << (2 * (courseIndex - 16)));
+        return;
+    }
     // unsigned: course 16 shifts into the top bits
     u32 mask = 0x3u << (2 * courseIndex);
 

@@ -1152,6 +1152,12 @@ void bhv_point_light_init(void);
 /* |description|Behavior loop function for the lighting engine point light|descriptionEnd| */
 void bhv_point_light_loop(void);
 
+// new64
+void bhv_new64_lundi_init(void);
+void bhv_new64_lundi_loop(void);
+void bhv_new64_geyser_init(void);
+void bhv_new64_geyser_loop(void);
+
 Gfx *geo_move_mario_part_from_parent(s32 run, UNUSED struct GraphNode *node, Mat4 mtx);
 
 // Bowser

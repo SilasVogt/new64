@@ -775,6 +775,8 @@ s64 DynOS_Bhv_ParseBehaviorScriptConstants(const String &_Arg, bool *found) {
     bhv_constant(id_bhvYellowBall);
     bhv_constant(id_bhvYellowCoin);
     bhv_constant(id_bhvYoshi);
+    bhv_constant(id_bhvNew64Lundi);
+    bhv_constant(id_bhvNew64Geyser);
     bhv_constant(id_RM_Scroll_Texture);
     bhv_constant(id_editor_Scroll_Texture);
     bhv_constant(id_bhvAmbientLight);

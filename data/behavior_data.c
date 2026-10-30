@@ -6488,3 +6488,27 @@ const BehaviorScript bhvPointLight[] = {
         CALL_NATIVE(bhv_point_light_loop),
     END_LOOP(),
 };
+
+// new64: Frostfire Fjord's puffins and geysers (src/game/behaviors/new64_frostfire.inc.c)
+const BehaviorScript bhvNew64Lundi[] = {
+    BEGIN(OBJ_LIST_GENACTOR),
+    ID(id_bhvNew64Lundi),
+    OR_INT(oFlags, (OBJ_FLAG_COMPUTE_ANGLE_TO_MARIO | OBJ_FLAG_COMPUTE_DIST_TO_MARIO | OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE)),
+    SET_HOME(),
+    SET_INT(oIntangibleTimer, 0),
+    CALL_NATIVE(bhv_new64_lundi_init),
+    BEGIN_LOOP(),
+        CALL_NATIVE(bhv_new64_lundi_loop),
+    END_LOOP(),
+};
+
+const BehaviorScript bhvNew64Geyser[] = {
+    BEGIN(OBJ_LIST_DEFAULT),
+    ID(id_bhvNew64Geyser),
+    OR_INT(oFlags, (OBJ_FLAG_COMPUTE_DIST_TO_MARIO | OBJ_FLAG_UPDATE_GFX_POS_AND_ANGLE)),
+    SET_HOME(),
+    CALL_NATIVE(bhv_new64_geyser_init),
+    BEGIN_LOOP(),
+        CALL_NATIVE(bhv_new64_geyser_loop),
+    END_LOOP(),
+};

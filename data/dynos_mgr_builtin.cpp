@@ -83,6 +83,7 @@ extern "C" {
 #include "levels/wf/header.h"
 #include "levels/wmotr/header.h"
 #include "levels/sgi/header.h"
+#include "levels/ffj/header.h"
 #include "levels/menu/header.h"
 
 #include "dynos_mgr_builtin_externs.h"
@@ -183,6 +184,7 @@ static const void* sDynosBuiltinScriptPtrs[] = {
     define_builtin(level_wf_entry),
     define_builtin(level_wmotr_entry),
     define_builtin(level_sgi_entry),
+    define_builtin(level_ffj_entry),
     define_builtin(level_main_menu_entry_1),
 };
 
@@ -226,6 +228,7 @@ void* gDynosLevelScriptsOriginal[LEVEL_COUNT] = {
     define_level_original(LEVEL_BOWSER_3, level_bowser_3_entry),
     define_level_original(LEVEL_SGI, level_sgi_entry),
     define_level_original(LEVEL_TTM, level_ttm_entry),
+    define_level_original(LEVEL_FFJ, level_ffj_entry),
 };
 
 const void* DynOS_Builtin_ScriptPtr_GetFromName(const char* aDataName) {

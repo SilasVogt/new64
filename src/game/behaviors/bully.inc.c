@@ -1,3 +1,8 @@
+#include "levels/ffj/layout.h"
+
+// new64: Big Chill Bully star above the ice floe in Frostfire Fjord.
+static Vec3f sFfjChillStarPos = FFJ_CHILL_STAR_POS;
+
 // bully.c.inc
 
 static struct ObjectHitbox sSmallBullyHitbox = {
@@ -242,7 +247,9 @@ void bully_step(void) {
     obj_check_floor_death(collisionFlags, sObjFloor);
 
     if (o->oBullySubtype & BULLY_STYPE_CHILL) {
-        if (o->oPosY < gBehaviorValues.ChillBullyDeathPosY) {
+        // new64: Frostfire Fjord's ice floe sits higher than Snowman's Land.
+        f32 deathY = (gCurrLevelNum == LEVEL_FFJ) ? FFJ_CHILL_BULLY_DEATH_Y : gBehaviorValues.ChillBullyDeathPosY;
+        if (o->oPosY < deathY) {
             o->oAction = BULLY_ACT_LAVA_DEATH;
         }
     }
@@ -275,6 +282,7 @@ void bully_act_level_death(void) {
 
             if (o->oBullySubtype == BULLY_STYPE_CHILL) {
                 f32* starPos = gLevelValues.starPositions.ChillBullyStarPos;
+                if (gCurrLevelNum == LEVEL_FFJ) { starPos = sFfjChillStarPos; } // new64
                 spawn_networked_default_star(starPos[0], starPos[1], starPos[2], o->oBullyLastNetworkPlayerIndex);
             } else {
                 f32* starPos = gLevelValues.starPositions.BigBullyTrioStarPos;

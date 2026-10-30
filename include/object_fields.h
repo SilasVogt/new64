@@ -175,6 +175,15 @@
 #define /*0x108*/ oActivatedBackAndForthPlatformVertical     OBJECT_FIELD_S32(0x20)
 #define /*0x10C*/ oActivatedBackAndForthPlatformFlipRotation OBJECT_FIELD_S32(0x21)
 
+/* new64: Lundi (Frostfire Fjord puffin) */
+#define /*0x0F4*/ oLundiOrbitAngle OBJECT_FIELD_S32(0x1B)
+#define /*0x0F8*/ oLundiCruiseY    OBJECT_FIELD_F32(0x1C)
+#define /*0x0FC*/ oLundiDiveTimer  OBJECT_FIELD_S32(0x1D)
+#define /*0x100*/ oLundiFlapTimer  OBJECT_FIELD_S32(0x1E)
+
+/* new64: Geyser */
+#define /*0x0F4*/ oGeyserHeight OBJECT_FIELD_F32(0x1B)
+
 /* Amp */
 #define /*0x0F4*/ oAmpRadiusOfRotation OBJECT_FIELD_F32(0x1B)
 #define /*0x0F8*/ oAmpYPhase           OBJECT_FIELD_S32(0x1C)
