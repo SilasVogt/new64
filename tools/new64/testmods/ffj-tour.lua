@@ -10,8 +10,8 @@ local TOUR = {
     { 1, -3200, 1200, 2600, 270 },   -- hot spring
     { 1, -3700, 1500, -3520, 270 },  -- ice cave mouth
     { 1, -7800, 1000, -400, 180 },   -- waterfall
-    { 1, 2100, 1600, -1500, 30 },    -- lava river
-    { 1, 3950, 4900, -4800, 125 },   -- crater
+    { 1, 2900, 1700, -1500, 270 },   -- lava river (from its east bank)
+    { 1, 3760, 4300, -5600, 90 },    -- crater (from the west rim)
     { 2, 0, 300, 2600, 180 },        -- ice cave: entry to crystal hall
     { 2, 0, 300, 900, 180 },         -- crystal hall and frozen lake
     { 2, 3300, 1000, -1400, 200 },   -- gallery

@@ -92,3 +92,6 @@ todo-old.txt
 tools/ido5.3_compiler/usr/lib/libc.so.1
 /.vs
 tools/audiofile/libaudiofile.a
+
+# new64 generator bytecode
+/tools/new64/__pycache__

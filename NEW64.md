@@ -48,6 +48,7 @@ second green warp pipe on the castle grounds, just south of the first.
   moss lava fields, a geyser field with a basalt spire, a milky blue hot
   spring, a turf-house village and church, a glacier with blue ice cliffs and
   a waterfall, and a volcano with a lava river and a crater lake. It snows.
+  The lava, the waterfall and the sea flow (scrolling textures).
 - **Glacier ice cave** (walk into the dark mouth in the ice cliff): a crystal
   hall over a frozen lake, a maze of side tunnels, an upper gallery and an
   ice slide back down.
@@ -62,7 +63,7 @@ second green warp pipe on the castle grounds, just south of the first.
 | 3 | Red Coins in the Glacier Cave | Eight red coins in the ice cave; the star appears over the pillar in the crystal hall. |
 | 4 | Lundi Patrol on the Sea Stacks | Defeat all five Lundi puffins; the star appears above the tallest sea stack. Climb the basalt columns from the beach. |
 | 5 | Behind the Roaring Waterfall | Walk through the waterfall into the alcove behind it. |
-| 6 | Stepping Stones in the Crater | Climb the volcano, drop onto the first basalt stone below the rim and hop to the spire in the lava lake. |
+| 6 | Stepping Stones in the Crater | Climb the volcano (every side is walkable), go round the rim to where the lava river starts, step down onto the basalt column there and cross the stepping stones; hop up onto the spire in the lava lake. |
 | 100 | 100 coins | About 240 coins across the three areas (coins carry over between areas). |
 
 ### Lundi, the frostfire puffin (new enemy)
@@ -120,9 +121,19 @@ make -j8
 ```
 
 `script.c`, `geo.c` and `header.h` in each level folder are hand-written;
-everything under `areas/`, the model folders and `layout.h` is generated. If
+everything under `areas/`, the model folders and `layout.h` is generated
+(`levels/sgi/areas/1/geo.inc.c` is the one hand-written file there). If
 you add display lists or behaviors, rerun `python3 autogen/extract_display_lists.py`
 and `python3 autogen/convert_constants.py`.
+
+`levelgen.py` builds terrain from a grid of 320-unit cells. A cell can carry a
+region function (material, and a drop or flat level for lava, lakes and
+islands); cells are then split along the region boundaries (marching squares),
+so lava banks, shores and material patches follow smooth curves instead of
+cell-sized steps, with banks walled where the floor drops. Materials can
+scroll: the generator writes `levels/ffj/scroll.inc.c`, and
+`geo_ffj_scroll_textures` in `levels/ffj/geo.c` moves those textures every
+frame.
 
 ## Tests
 
@@ -143,3 +154,11 @@ grep new64-flow /tmp/new64-shots/flow/game.log   # expect "FINAL flags 0x7F"
 - `ffj-flow.lua`: all 7 Frostfire stars, real geyser rides and Lundi stomps,
   every area warp (expect `FINAL flags 0x7F`).
 - `ffj-tour.lua`: camera tour of all three Frostfire areas for screenshots.
+- `ffj-walk.lua`: real stick input: climbs the volcano from nine directions
+  and walks the crater stones to the spire (expect `REACHED` for every run).
+- `shots.lua` via `tools/new64/shots.sh <ffj|sgi> <outdir>`: fixed-camera
+  screenshots of both courses and a contact sheet. Compare two runs with
+  `python3 tools/new64/shot_sheet.py --compare <before> <after> <out prefix>`.
+
+Delete `sm64_save_file.bin` in the save folder before a flow test, otherwise
+stars from the last run are already set.
