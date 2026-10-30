@@ -28,6 +28,7 @@
 #endif // End of OS-Specific GL defines
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "gfx_window_manager_api.h"
@@ -311,7 +312,40 @@ static bool gfx_sdl_start_frame(void) {
     return true;
 }
 
+// Dev aid: with NEW64_SHOT_DIR set, dump the back buffer to a PPM every
+// NEW64_SHOT_EVERY frames (default 30). Used to screenshot automated test runs.
+static void gfx_sdl_dev_screenshot(void) {
+    static const char *dir = NULL;
+    static int every = 0;
+    static unsigned frame = 0;
+    if (every == 0) {
+        dir = getenv("NEW64_SHOT_DIR");
+        const char *e = getenv("NEW64_SHOT_EVERY");
+        every = (e && atoi(e) > 0) ? atoi(e) : 30;
+    }
+    if (dir == NULL || (++frame % every) != 0) { return; }
+
+    int w = 0, h = 0;
+    SDL_GL_GetDrawableSize(wnd, &w, &h);
+    if (w <= 0 || h <= 0) { return; }
+    unsigned char *px = malloc((size_t)w * h * 3);
+    if (px == NULL) { return; }
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, px);
+
+    char path[512];
+    snprintf(path, sizeof(path), "%s/frame_%06u.ppm", dir, frame);
+    FILE *f = fopen(path, "wb");
+    if (f != NULL) {
+        fprintf(f, "P6\n%d %d\n255\n", w, h);
+        for (int y = h - 1; y >= 0; y--) { fwrite(px + (size_t)y * w * 3, 1, (size_t)w * 3, f); }
+        fclose(f);
+    }
+    free(px);
+}
+
 static void gfx_sdl_swap_buffers_begin(void) {
+    gfx_sdl_dev_screenshot();
     SDL_GL_SwapWindow(wnd);
 }
 
