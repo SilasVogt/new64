@@ -247,8 +247,13 @@ void bully_step(void) {
     obj_check_floor_death(collisionFlags, sObjFloor);
 
     if (o->oBullySubtype & BULLY_STYPE_CHILL) {
-        // new64: Frostfire Fjord's ice floe sits higher than Snowman's Land.
-        f32 deathY = (gCurrLevelNum == LEVEL_FFJ) ? FFJ_CHILL_BULLY_DEATH_Y : gBehaviorValues.ChillBullyDeathPosY;
+        // new64: in Frostfire Fjord only the magma hall (area 3) has a fall
+        // height; the ice cave sits below Snowman's Land's 1030, and lava
+        // floors still kill chill bullies everywhere through floor death.
+        f32 deathY = gBehaviorValues.ChillBullyDeathPosY;
+        if (gCurrLevelNum == LEVEL_FFJ) {
+            deathY = (gCurrAreaIndex == 3) ? FFJ_CHILL_BULLY_DEATH_Y : -20000.0f;
+        }
         if (o->oPosY < deathY) {
             o->oAction = BULLY_ACT_LAVA_DEATH;
         }
