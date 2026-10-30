@@ -65,7 +65,7 @@ add("waterfall ray", 5, function()
     end
 end)
 add("waterfall star", 100, function() tp(-7800, 720, -2456) end)
-add("crater rim", 60, function() tp(4040, 4500, -4930) end)
+add("crater rim", 60, function() tp(3760, 4300, -5600) end)
 add("crater rim result", 5, function() log(string.format("crater rim floor %.0f", gMarioStates[0].floorHeight)) end)
 add("crater star", 100, function() tp(5200, 4250, -5600) end)
 

@@ -15,6 +15,11 @@ import random
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from levelgen import Noise  # noqa: E402
+
+NOISE = Noise(16)
+
 # --------------------------------------------------------------------------
 # Materials: ROM textures (all 32x32 RGBA16) + a base tint for vertex colours
 # --------------------------------------------------------------------------
@@ -59,6 +64,16 @@ def dot(a, b):
 SUN = norm(SUN)
 
 
+def vertex_tone(p, mat):
+    """Brightness multiplier per vertex: gentle noise everywhere, a little
+    more contrast on the rock and dirt."""
+    n = NOISE.fbm(p[0] / 650 + p[1] / 900, p[2] / 650, 3)
+    k = 1.0 + 0.11 * n
+    if mat in ("rock", "dirt"):
+        k *= 0.95 + 0.05 * n
+    return k
+
+
 class Level:
     def __init__(self):
         self.tris = {m: [] for m in MATERIALS}   # material -> [(verts, uvs, cols)]
@@ -82,10 +97,14 @@ class Level:
         # fixed-point coordinates small.
         ou, ov = math.floor(min(u for u, _ in uv)), math.floor(min(v for _, v in uv))
         uv = tuple((u - ou, v - ov) for u, v in uv)
-        tint = MATERIALS[mat][1]
-        col = tuple(max(0, min(255, int(t * light))) for t in tint)
         if mat is not None:
-            self.tris[mat].append(((a, b, c), uv, (col, col, col)))
+            tint = MATERIALS[mat][1]
+            cols = []
+            for p in (a, b, c):
+                # Soft brightness noise per vertex so big surfaces aren't flat
+                k = light * vertex_tone(p, mat)
+                cols.append(tuple(max(0, min(255, int(t * k))) for t in tint))
+            self.tris[mat].append(((a, b, c), uv, tuple(cols)))
         if surface is not None:
             self.col.setdefault(surface, []).append((a, b, c))
 
@@ -107,12 +126,17 @@ class Level:
         pts = [(cx + math.sin(a) * r, cy, cz + math.cos(a) * r) for a, r in ring]
         centre = (cx, cy, cz)
         up = (0, 1, 0)
-        # Top: fan, planar UVs relative to the centre
+        # Top: a fan for collision; drawn as an inner ring plus an outer band
+        # so the colour can vary across it.
         def puv(p):
             return ((p[0] - cx) / TEX_WORLD, (p[2] - cz) / TEX_WORLD)
+        inner = [(cx + (x - cx) * 0.55, cy, cz + (z - cz) * 0.55) for x, _, z in pts]
         for i in range(segments):
-            p, q = pts[i], pts[(i + 1) % segments]
-            self.tri(top, centre, p, q, (puv(centre), puv(p), puv(q)), up)
+            j = (i + 1) % segments
+            p, q = pts[i], pts[j]
+            self.tri(None, centre, p, q, (puv(centre), puv(p), puv(q)), up)
+            self.tri(top, centre, inner[i], inner[j], (puv(centre), puv(inner[i]), puv(inner[j])), up, 1.0, None)
+            self.quad(top, inner[i], p, q, inner[j], (puv(inner[i]), puv(p), puv(q), puv(inner[j])), up, 0.97, None)
         # Side band (walls) with the grass edge at the top of the texture
         perim = 0.0
         for i in range(segments):
@@ -131,7 +155,7 @@ class Level:
             f = k / levels
             shrink = 1 - f ** 0.8 * 0.92
             y = cy - band - depth * f
-            jitter = [rng.uniform(0.85, 1.1) for _ in range(segments)]
+            jitter = [rng.uniform(0.74, 1.18) for _ in range(segments)]
             cur = [(cx + (x - cx) * shrink * jitter[i], y, cz + (z - cz) * shrink * jitter[i])
                    for i, (x, _, z) in enumerate(pts)]
             if k == levels:
@@ -153,8 +177,29 @@ class Level:
                     self.quad(under, prev[i], prev[j], cur[j], cur[i],
                               ((u0, vt0), (u1, vt0), (u1, vt1), (u0, vt1)), out, shade, None)
             prev = cur
+        # Rock spikes hanging from the underside
+        for n in range(max(3, segments // 6)):
+            a = rng.uniform(0, math.tau)
+            rr = radius * rng.uniform(0.25, 0.7)
+            sx, sz = cx + math.sin(a) * rr, cz + math.cos(a) * rr
+            tip = cy - band - depth * rng.uniform(0.8, 1.1)
+            self.spike(sx, sz, radius * rng.uniform(0.07, 0.13), cy - band - 40, tip, under, seed=int(a * 1000))
         self.footprints.append(("island", [(p[0], p[2]) for p in pts], top))
         return pts
+
+    def spike(self, cx, cz, r, y_top, y_tip, mat, seed=0, sides=6):
+        """Downward rock spike (visual only)."""
+        rng = random.Random(seed)
+        ring = [(cx + math.sin(math.tau * i / sides) * r * rng.uniform(0.8, 1.2),
+                 cz + math.cos(math.tau * i / sides) * r * rng.uniform(0.8, 1.2)) for i in range(sides)]
+        tip = (cx + rng.uniform(-0.3, 0.3) * r, y_tip, cz + rng.uniform(-0.3, 0.3) * r)
+        for i in range(sides):
+            j = (i + 1) % sides
+            a, b = (ring[i][0], y_top, ring[i][1]), (ring[j][0], y_top, ring[j][1])
+            out = ((ring[i][0] + ring[j][0]) / 2 - cx, -0.4, (ring[i][1] + ring[j][1]) / 2 - cz)
+            L = math.dist(ring[i], ring[j]) / TEX_WORLD
+            h = (y_top - y_tip) / TEX_WORLD
+            self.tri(mat, a, b, tip, ((0, 0), (L, 0), (L / 2, h)), out, 0.6, None)
 
     def obox(self, centre, size, yaw_deg, top="wood", side="wood", bottom="dirt",
              collide_bottom=True):

@@ -97,29 +97,38 @@ def load_texture_sizes(root):
 
 class Material:
     def __init__(self, name, tex, tint=(255, 255, 255), alpha=255, surface=SURFACE_DEFAULT,
-                 world=256.0, glow=1.0, unlit=False, clamp=False):
+                 world=256.0, glow=1.0, unlit=False, clamp=False, vary=0.0, scroll=None):
         self.name, self.tex, self.tint, self.alpha = name, tex, tint, alpha
         self.surface = surface      # default collision type for this material
         self.world = world          # world units per texture repeat
         self.glow = glow            # how much area glow (lava light) affects it
         self.unlit = unlit          # ignore sun shading (lava, emissive)
         self.clamp = clamp
+        self.vary = vary            # brightness noise, breaks up large flat areas
+        self.scroll = scroll        # (s, t) texture scroll in 1/32 texel per frame
 
     @property
     def translucent(self):
         return self.alpha < 255
 
 
+VARY = Noise(4242)
+
+
 class Light:
-    """Directional sun + ambient + optional point-ish glow function."""
+    """Directional sun + ambient + optional point-ish glow function.
+
+    paint(p, mat) may return an (r, g, b) multiplier per vertex (moss in the
+    hollows, snow on the peaks, hot lava in the middle of a flow)."""
 
     def __init__(self, sun=(0.35, 0.85, 0.4), ambient=0.55, sun_color=(1.0, 1.0, 1.0),
-                 ambient_color=(1.0, 1.0, 1.0), glow=None):
+                 ambient_color=(1.0, 1.0, 1.0), glow=None, paint=None):
         self.sun = norm(sun)
         self.ambient = ambient
         self.sun_color = sun_color
         self.ambient_color = ambient_color
         self.glow = glow            # fn(p) -> (r, g, b) additive, 0..1 scale
+        self.paint = paint
 
     def shade(self, p, n, mat, extra=1.0):
         if mat.unlit:
@@ -127,7 +136,14 @@ class Light:
         else:
             d = max(0.0, dot(n, self.sun))
             c = [self.ambient * self.ambient_color[i] + (1 - self.ambient) * d * self.sun_color[i] for i in range(3)]
+        if mat.vary:
+            # Low-frequency brightness noise, sheared by height so walls vary too
+            extra *= 1.0 + mat.vary * VARY.fbm(p[0] / 900 + p[1] / 1400, p[2] / 900 - p[1] / 1700, 3)
         c = [v * extra for v in c]
+        if self.paint:
+            pm = self.paint(p, mat.name)
+            if pm is not None:
+                c = [c[i] * pm[i] for i in range(3)]
         if self.glow and mat.glow > 0:
             g = self.glow(p)
             c = [c[i] + g[i] * mat.glow for i in range(3)]
@@ -266,6 +282,42 @@ class Area:
             h = abs(y_tip - y_base) / w
             self.tri(mat, a, b, tip, ((0, 0), (L, 0), (L / 2, h)), out, shade, surf)
 
+    def rock(self, cx, cz, r, y0, h, mat="basalt", sides=5, seed=0, collide=True, cap=None, lean=0.0):
+        """Faceted boulder: straight sides up to 60% of its height (walls for
+        collision), then a tapered crown and a flat top. y0 is the buried base."""
+        rng = random.Random(seed)
+        cap = cap or mat
+        a0 = rng.uniform(0, math.tau)
+        jit = [rng.uniform(0.78, 1.15) for _ in range(sides)]
+        ang = [a0 + math.tau * (i + rng.uniform(-0.18, 0.18)) / sides for i in range(sides)]
+        ring = [(cx + math.sin(a) * r * j, cz + math.cos(a) * r * j) for a, j in zip(ang, jit)]
+        lx, lz = math.sin(a0) * lean * h, math.cos(a0) * lean * h
+        top = [(cx + lx + (x - cx) * rng.uniform(0.5, 0.72), cz + lz + (z - cz) * rng.uniform(0.5, 0.72))
+               for x, z in ring]
+        ym = y0 + 0.6 * h
+        yt = [y0 + h * rng.uniform(0.94, 1.06) for _ in range(sides)]
+        surf = "mat" if collide else None
+        w = self.level.mats[mat].world
+        u = 0.0
+        for i in range(sides):
+            j = (i + 1) % sides
+            out = ((ring[i][0] + ring[j][0]) / 2 - cx, 0, (ring[i][1] + ring[j][1]) / 2 - cz)
+            self.wall_quad(mat, ring[i], ring[j], y0, ym, y0, ym, out, 0.9, surf, u)
+            L = math.dist(ring[i], ring[j]) / w
+            a, b = (ring[i][0], ym, ring[i][1]), (ring[j][0], ym, ring[j][1])
+            c, d = (top[j][0], yt[j], top[j][1]), (top[i][0], yt[i], top[i][1])
+            up = (out[0], 0.8 * r, out[2])
+            self.quad(mat, a, b, c, d, ((u, 0), (u + L, 0), (u + L, -0.4 * h / w), (u, -0.4 * h / w)), up, 1.0, surf)
+            u += L
+        ct = (cx + lx, sum(yt) / sides + 0.04 * h, cz + lz)
+        cw = self.level.mats[cap].world
+        uv = lambda p: ((p[0] - cx) / cw, (p[2] - cz) / cw)
+        for i in range(sides):
+            j = (i + 1) % sides
+            a, b = (top[i][0], yt[i], top[i][1]), (top[j][0], yt[j], top[j][1])
+            self.tri(cap, ct, a, b, (uv(ct), uv(a), uv(b)), (0, 1, 0), 1.0, surf)
+        self.footprints.append((ring, mat))
+
     def sheet(self, pts, mat, uvs, want, alpha=None, surface=None, shade=1.0):
         """Free quad (waterfall, water surface, steam). No collision by default."""
         self.quad(mat, pts[0], pts[1], pts[2], pts[3], uvs, want, shade, surface, alpha)
@@ -318,6 +370,62 @@ class Area:
         self.objects.append((model, pos, (pitch, yaw, roll), param, beh, acts))
 
 
+class Region:
+    """What the floor is at one point of a Grid cell: its material, and its
+    height as a drop below the cell's terrain or an absolute level (lava lake,
+    island top). Cells with a region function are split along the boundaries
+    between regions (marching squares), so lava shores, islands and material
+    patches get smooth, diagonal edges instead of cell-sized stairs."""
+    __slots__ = ("key", "mat", "drop", "level", "surface", "wall", "overlay", "spill")
+
+    def __init__(self, key, mat, drop=0.0, level=None, surface="mat", wall=None, overlay=None, spill=None):
+        self.key, self.mat, self.drop, self.level = key, mat, drop, level
+        self.surface, self.wall = surface, wall
+        self.overlay = overlay      # translucent material drawn just above (flowing lava glow)
+        self.spill = spill          # wall material where this pours onto lower ground of its own kind
+
+    @property
+    def hkey(self):
+        return ("level", round(self.level)) if self.level is not None else ("drop", round(self.drop))
+
+
+def _rkey(r):
+    return r.key
+
+
+def _hkey(r):
+    return r.hkey
+
+
+def _clip(poly, side):
+    """Keep the part of a convex (u, v, x, z) polygon where side(u, v) >= 0."""
+    out = []
+    for j in range(len(poly)):
+        p, q = poly[j], poly[(j + 1) % len(poly)]
+        sp, sq = side(p[0], p[1]), side(q[0], q[1])
+        if sp >= 0:
+            out.append(p)
+        if (sp >= 0) != (sq >= 0):
+            t = sp / (sp - sq)
+            out.append(tuple(p[m] + (q[m] - p[m]) * t for m in range(4)))
+    return out if len(out) >= 3 else []
+
+
+def _inside(poly, u, v, eps=1e-9):
+    """Is (u, v) inside or on a convex (u, v, x, z) polygon (either winding)?"""
+    sign = 0
+    for j in range(len(poly)):
+        p, q = poly[j], poly[(j + 1) % len(poly)]
+        cr = (q[0] - p[0]) * (v - p[1]) - (q[1] - p[1]) * (u - p[0])
+        if abs(cr) <= eps:
+            continue
+        if sign == 0:
+            sign = 1 if cr > 0 else -1
+        elif (cr > 0) != (sign > 0):
+            return False
+    return True
+
+
 class Grid:
     """2.5D grid for terrain and caves.
 
@@ -326,12 +434,14 @@ class Grid:
       ceil:  same, or None for open sky
       mat:   floor material; wall: wall material; ceilmat: ceiling material
       surface: optional collision override for the floor
+      region: optional fn(x, z) -> Region; splits the floor along region edges
     Corners are (x0,z0), (x1,z0), (x1,z1), (x0,z1).
     """
 
     def __init__(self, area, x0, z0, cell, nx, nz):
         self.a, self.x0, self.z0, self.cell, self.nx, self.nz = area, x0, z0, cell, nx, nz
         self.cells = {}
+        self.xcache = {}
 
     def corner(self, i, k):
         return (self.x0 + i * self.cell, self.z0 + k * self.cell)
@@ -346,35 +456,430 @@ class Grid:
                         if isinstance(v, (int, float)):
                             c[key] = (v, v, v, v)
                     self.cells[(i, k)] = c
+        self._prepare()
 
-    def build(self, floor_normals=None, wall_mat_default="rock", skip_floor=None):
+    # -- regions ------------------------------------------------------------
+    def _prepare(self):
+        """Corner regions and effective corner heights (what neighbours see)."""
+        for (i, k), c in self.cells.items():
+            fn = c.get("region")
+            if fn is None:
+                c["eff"] = c["floor"]
+                continue
+            P = [self.corner(i, k), self.corner(i + 1, k), self.corner(i + 1, k + 1), self.corner(i, k + 1)]
+            R = [fn(x, z) for x, z in P]
+            c["regions"] = R
+            f = c["floor"]
+            c["eff"] = tuple(R[j].level if R[j].level is not None else f[j] - R[j].drop for j in range(4))
+
+    @staticmethod
+    def _plane(f, u, v):
+        """Height inside a cell with corner heights f, split like the floor tris."""
+        if abs(f[0] - f[2]) <= abs(f[1] - f[3]):
+            if u >= v:
+                return f[0] + (f[1] - f[0]) * u + (f[2] - f[1]) * v
+            return f[0] + (f[2] - f[3]) * u + (f[3] - f[0]) * v
+        if u + v <= 1:
+            return f[0] + (f[1] - f[0]) * u + (f[3] - f[0]) * v
+        return f[2] + (f[3] - f[2]) * (1 - u) + (f[1] - f[2]) * (1 - v)
+
+    def height_at(self, x, z, default=None):
+        """Floor height under (x, z) as built: region cells are looked up in
+        the same pieces the floor is made of, so objects placed with this sit
+        on the mesh even right at a lava bank."""
+        i, k = int((x - self.x0) // self.cell), int((z - self.z0) // self.cell)
+        c = self.cells.get((i, k))
+        if c is None:
+            return default
+        u, v = (x - (self.x0 + i * self.cell)) / self.cell, (z - (self.z0 + k * self.cell)) / self.cell
+        fn = c.get("region")
+        if fn is None:
+            return self._plane(c["floor"], u, v)
+        pieces, _ = self._cell_pieces(i, k, c)
+        for pc in pieces:
+            if pc["visual"] and _inside(pc["poly"], u, v):
+                r = pc["reg"]
+                return r.level if r.level is not None else self._plane(c["floor"], u, v) - r.drop
+        r = fn(x, z)
+        return r.level if r.level is not None else self._plane(c["floor"], u, v) - r.drop
+
+    def _crossing(self, ca, cb, fn, keyf):
+        """Where along the grid edge between corners ca and cb (i, k) the
+        region key changes. Cached and walked in a fixed direction so both
+        cells sharing the edge agree exactly."""
+        if cb < ca:
+            ca, cb = cb, ca
+        key = (ca, cb, keyf.__name__, id(fn))
+        hit = self.xcache.get(key)
+        if hit is None:
+            pa, pb = self.corner(*ca), self.corner(*cb)
+            k0 = keyf(fn(*pa))
+            lo, hi = 0.0, 1.0
+            for _ in range(11):
+                m = (lo + hi) / 2
+                if keyf(fn(pa[0] + (pb[0] - pa[0]) * m, pa[1] + (pb[1] - pa[1]) * m)) == k0:
+                    lo = m
+                else:
+                    hi = m
+            t = (lo + hi) / 2
+            hit = (pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t)
+            self.xcache[key] = hit
+        return hit
+
+    def _sub_crossing(self, pa, pb, fn, keyf):
+        """Like _crossing, between any two points (inside a subdivided cell)."""
+        ka, kb = (round(pa[0], 3), round(pa[1], 3)), (round(pb[0], 3), round(pb[1], 3))
+        if kb < ka:
+            pa, pb, ka, kb = pb, pa, kb, ka
+        key = (ka, kb, keyf.__name__, id(fn))
+        hit = self.xcache.get(key)
+        if hit is None:
+            k0 = keyf(fn(*pa))
+            lo, hi = 0.0, 1.0
+            for _ in range(11):
+                m = (lo + hi) / 2
+                if keyf(fn(pa[0] + (pb[0] - pa[0]) * m, pa[1] + (pb[1] - pa[1]) * m)) == k0:
+                    lo = m
+                else:
+                    hi = m
+            t = (lo + hi) / 2
+            hit = (pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t)
+            self.xcache[key] = hit
+        return hit
+
+    def _uvxz(self, i, k, u, v):
+        x0, z0 = self.corner(i, k)
+        return (u, v, x0 + u * self.cell, z0 + v * self.cell)
+
+    def _split(self, i, k, c, sq, R4, keyf):
+        """Marching squares over one square of a cell (sq = (u0, v0, u1, v1),
+        the whole cell or a part of it) with corner regions R4. Returns
+        (polys, cuts): polys = [(side, [(u, v, x, z)...])], cuts = [(p, q, ref,
+        ref_side)] in (x, z), ref being a point on side ref_side of the cut.
+        Side 0 is the class of the square's first corner."""
+        u0, v0, u1, v1 = sq
+        cs = self.cell
+        x0, z0 = self.corner(i, k)
+        V = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1), self._uvxz(i, k, u0, v1)]
+        whole = sq == (0.0, 0.0, 1.0, 1.0)
+        ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+        k0 = keyf(R4[0])
+        s = [0 if keyf(r) == k0 else 1 for r in R4]
+        fn = c["region"]
+        X = {}
+        for j in range(4):
+            jn = (j + 1) % 4
+            if s[j] != s[jn]:
+                edge = None if whole else self._border_edge(V[j], V[jn])
+                if whole:
+                    x, z = self._crossing(ids[j], ids[jn], fn, keyf)
+                elif edge is not None:
+                    # On the cell's border: the very crossing the neighbour uses
+                    x, z = self._crossing(ids[edge[0]], ids[edge[1]], fn, keyf)
+                else:
+                    x, z = self._sub_crossing(V[j][2:], V[jn][2:], fn, keyf)
+                X[j] = ((x - x0) / cs, (z - z0) / cs, x, z)
+        saddle = s[0] == s[2] and s[1] == s[3] and s[0] != s[1]
+        if not saddle:
+            polys = {0: [], 1: []}
+            for j in range(4):
+                polys[s[j]].append(V[j])
+                if j in X:
+                    polys[0].append(X[j])
+                    polys[1].append(X[j])
+            a, b = [X[j] for j in sorted(X)]
+            return [(0, polys[0]), (1, polys[1])], [((a[2], a[3]), (b[2], b[3]), V[0][2:], 0)]
+        C = self._uvxz(i, k, (u0 + u1) / 2, (v0 + v1) / 2)
+        mid = 0 if keyf(fn(C[2], C[3])) == k0 else 1
+        polys, cuts = [], []
+        ring = []
+        for j in range(4):
+            ring += [V[j], X[j]]
+        # The middle's class joins its two corners; the other two are islands
+        iso = [1, 3] if s[0] == mid else [0, 2]
+        for j in iso:
+            polys.append((s[j], [X[(j - 1) % 4], V[j], X[j]]))
+            cuts.append(((X[(j - 1) % 4][2], X[(j - 1) % 4][3]), (X[j][2], X[j][3]), V[j][2:], s[j]))
+        # The joined class: a hexagon around the centre, fanned from it
+        hexa = [v for v in ring if v not in [V[j] for j in iso]]
+        for n in range(len(hexa)):
+            polys.append((mid, [C, hexa[n], hexa[(n + 1) % len(hexa)]]))
+        return polys, cuts
+
+    @staticmethod
+    def _border_edge(a, b):
+        """The cell edge (corner indices) a sub-edge between (u, v, ..) points
+        lies on, or None if it runs through the inside of the cell."""
+        for coord, val, edge in ((1, 0.0, (0, 1)), (0, 1.0, (1, 2)), (1, 1.0, (3, 2)), (0, 0.0, (0, 3))):
+            if a[coord] == val and b[coord] == val:
+                return edge
+        return None
+
+    def _border_region(self, c, i, k, u, v):
+        """Region at a point on the cell's border, as the neighbouring cell
+        sees that edge: its two corners and at most one crossing. Sampling the
+        region there instead could find a sliver the neighbour never draws."""
+        R = c["regions"]
+        j0, j1, t = {(1, 0.0): (0, 1, u), (0, 1.0): (1, 2, v), (1, 1.0): (3, 2, u), (0, 0.0): (0, 3, v)}[
+            (1, v) if v in (0.0, 1.0) else (0, u)]
+        a, b = R[j0], R[j1]
+        if a.key == b.key:
+            return a
+        keyf = _hkey if a.hkey != b.hkey else _rkey
+        ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+        x, z = self._crossing(ids[j0], ids[j1], c["region"], keyf)
+        tx = math.dist(self.corner(*ids[j0]), (x, z)) / self.cell
+        return a if t < tx else b
+
+    def _surf(self, c, r):
+        s = c.get("surface", r.surface)
+        return self.a.level.mats[r.mat].surface if s == "mat" else s
+
+    def _cell_pieces(self, i, k, c):
+        """The floor of a region cell as pieces plus the walls along its cuts.
+        Cached: building and height_at use the very same pieces."""
+        if "_pieces" not in c:
+            c["_pieces"] = self._square_pieces(c, i, k, (0.0, 0.0, 1.0, 1.0), tuple(c["regions"]), 0)
+        return c["_pieces"]
+
+    def _square_pieces(self, c, i, k, sq, R4, depth):
+        """Pieces of one square: {reg, poly, visual, collide}, and cut
+        walls (p, q, regs, ref, ref_side). Where three height classes meet
+        (a lava stream reaching a lake past its bank) the square is quartered,
+        up to three times, so each meeting gets the normal split and walls; the
+        last tiny square at the meeting point is fanned from its centre."""
+        u0, v0, u1, v1 = sq
+        quad = [self._uvxz(i, k, u0, v0), self._uvxz(i, k, u1, v0), self._uvxz(i, k, u1, v1),
+                self._uvxz(i, k, u0, v1)]
+        hk = {r.hkey for r in R4}
+        keys = {r.key for r in R4}
+        fn = c["region"]
+        if len(hk) > 2:
+            um, vm = (u0 + u1) / 2, (v0 + v1) / 2
+            if depth < 3:
+                def at(u, v):
+                    if u in (0.0, 1.0) or v in (0.0, 1.0):
+                        return self._border_region(c, i, k, u, v)
+                    q = self._uvxz(i, k, u, v)
+                    return fn(q[2], q[3])
+                rb, rr, rt, rl, rc = at(um, v0), at(u1, vm), at(um, v1), at(u0, vm), at(um, vm)
+                pieces, walls = [], []
+                for sq2, R2 in (((u0, v0, um, vm), (R4[0], rb, rc, rl)), ((um, v0, u1, vm), (rb, R4[1], rr, rc)),
+                                ((um, vm, u1, v1), (rc, rr, R4[2], rt)), ((u0, vm, um, v1), (rl, rc, rt, R4[3]))):
+                    p2, w2 = self._square_pieces(c, i, k, sq2, R2, depth + 1)
+                    pieces += p2
+                    walls += w2
+                return pieces, walls
+            # The meeting point itself: fan the square from its centre. Each
+            # stretch of its border keeps its corner's class up to the same
+            # crossings the neighbouring squares use, so the edges match
+            # exactly; walls run from the centre out to each crossing.
+            ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+            x0, z0 = self.corner(i, k)
+            ring = []
+            for j in range(4):
+                jn = (j + 1) % 4
+                ring.append((quad[j], R4[j]))
+                if R4[j].hkey != R4[jn].hkey:
+                    edge = self._border_edge(quad[j], quad[jn])
+                    if edge is not None:
+                        x, z = self._crossing(ids[edge[0]], ids[edge[1]], fn, _hkey)
+                    else:
+                        x, z = self._sub_crossing(quad[j][2:], quad[jn][2:], fn, _hkey)
+                    ring.append((((x - x0) / self.cell, (z - z0) / self.cell, x, z), R4[jn]))
+            C = self._uvxz(i, k, um, vm)
+            pieces, walls = [], []
+            for n, (pt, r) in enumerate(ring):
+                nxt = ring[(n + 1) % len(ring)][0]
+                pieces.append({"reg": r, "poly": [C, pt, nxt], "visual": True, "collide": True})
+                prev = ring[n - 1][1]
+                if prev.hkey != r.hkey:
+                    ref = ((pt[2] + nxt[2]) / 2, (pt[3] + nxt[3]) / 2)
+                    walls.append((C[2:], pt[2:], {0: prev, 1: r}, ref, 1))
+            return pieces, walls
+        if len(keys) == 1:
+            return [{"reg": R4[0], "poly": quad, "visual": True, "collide": True}], []
+        if len(hk) == 1:
+            # Same height, different materials: split the look, keep the
+            # plain square for collision unless the surfaces differ too.
+            polys, _ = self._split(i, k, c, sq, R4, _rkey)
+            regs = self._side_regions(R4, _rkey)
+            if len({self._surf(c, r) for r in R4}) == 1:
+                pieces = [{"reg": regs[sd], "poly": pl, "visual": True, "collide": False} for sd, pl in polys]
+                pieces.append({"reg": R4[0], "poly": quad, "visual": False, "collide": True})
+                return pieces, []
+            return [{"reg": regs[sd], "poly": pl, "visual": True, "collide": True} for sd, pl in polys], []
+        # Two height classes: split, then wall up the cut from the lower side
+        polys, cuts = self._split(i, k, c, sq, R4, _hkey)
+        regs = self._side_regions(R4, _hkey)
+        return ([{"reg": regs[sd], "poly": pl, "visual": True, "collide": True} for sd, pl in polys],
+                [(pp, qq, regs, ref, ref_side) for pp, qq, ref, ref_side in cuts])
+
+    def _emit_floor_poly(self, c, poly, reg, surf, ns_fn, visual=True):
+        """Fan a convex (u, v, x, z) polygon into floor triangles, cut along
+        the cell diagonal first so every piece lies on one terrain plane."""
+        a = self.a
+        f = c["floor"]
+        if abs(f[0] - f[2]) <= abs(f[1] - f[3]):
+            sides = (lambda u, v: u - v, lambda u, v: v - u)
+        else:
+            sides = (lambda u, v: 1 - u - v, lambda u, v: u + v - 1)
+        mat = reg.mat if visual else None
+        w = a.level.mats[reg.mat].world
+        for side in sides:
+            piece = _clip(poly, side)
+            if not piece:
+                continue
+            pts = []
+            for u, v, x, z in piece:
+                y = reg.level if reg.level is not None else self._plane(f, u, v) - reg.drop
+                pts.append((x, y, z))
+            for n in range(1, len(pts) - 1):
+                tri = (pts[0], pts[n], pts[n + 1])
+                if math.dist((tri[0][0], tri[0][2]), (tri[1][0], tri[1][2])) < 0.5 or \
+                   math.dist((tri[1][0], tri[1][2]), (tri[2][0], tri[2][2])) < 0.5 or \
+                   math.dist((tri[0][0], tri[0][2]), (tri[2][0], tri[2][2])) < 0.5:
+                    continue
+                ns = tuple(ns_fn(p[0], p[2]) for p in tri) if ns_fn and reg.level is None else None
+                a.tri(mat, *tri, tuple((p[0] / w, p[2] / w) for p in tri), (0, 1, 0), 1.0, surf, normals=ns)
+                if visual and reg.overlay:
+                    om = a.level.mats[reg.overlay]
+                    up = tuple((p[0], p[1] + 6, p[2]) for p in tri)
+                    al = tuple(int(om.alpha * max(0.3, min(1.0, 0.7 + 0.6 * VARY.fbm(p[0] / 1100, p[2] / 1100, 2))))
+                               for p in tri)
+                    a.tri(reg.overlay, *up, tuple((p[0] / om.world, p[2] / om.world) for p in tri), (0, 1, 0),
+                          1.0, None, alpha=al)
+
+    def _region_floor(self, i, k, c, ns_fn, wall_mat_default):
+        """Floor (and cut walls) of a cell with a region function."""
+        P = [self.corner(i, k), self.corner(i + 1, k), self.corner(i + 1, k + 1), self.corner(i, k + 1)]
+        pieces, walls = self._cell_pieces(i, k, c)
+        for pc in pieces:
+            surf = self._surf(c, pc["reg"]) if pc["collide"] else None
+            self._emit_floor_poly(c, pc["poly"], pc["reg"], surf, ns_fn, visual=pc["visual"])
+        for p, q, regs, ref, ref_side in walls:
+            self._cut_wall(c, P, p, q, regs, ref, ref_side, wall_mat_default)
+
+    def _side_regions(self, R, keyf):
+        """Region used for each side of a split (majority of that side's corners)."""
+        k0 = keyf(R[0])
+        out = {}
+        for side in (0, 1):
+            group = [r for r in R if (keyf(r) == k0) == (side == 0)]
+            counts = {}
+            for r in group:
+                counts[r.key] = counts.get(r.key, 0) + 1
+            best = max(counts, key=lambda kk: counts[kk])
+            out[side] = next(r for r in group if r.key == best)
+        return out
+
+    def _cut_wall(self, c, P, p, q, regs, ref, ref_side, wall_mat_default):
+        """Wall along a cut segment between the two height classes, facing
+        the lower one. ref is a point on side ref_side of the cut."""
+        f = c["floor"]
+        cs = self.cell
+        x0, z0 = P[0]
+
+        def h(reg, pt):
+            if reg.level is not None:
+                return reg.level
+            return self._plane(f, (pt[0] - x0) / cs, (pt[1] - z0) / cs) - reg.drop
+        # Split the segment where it crosses the cell diagonal so the wall
+        # follows both floor planes exactly.
+        if abs(f[0] - f[2]) <= abs(f[1] - f[3]):
+            side = lambda pt: (pt[0] - x0) / cs - (pt[1] - z0) / cs
+        else:
+            side = lambda pt: 1 - (pt[0] - x0) / cs - (pt[1] - z0) / cs
+        segs = [(p, q)]
+        sp, sq = side(p), side(q)
+        if (sp > 1e-6 and sq < -1e-6) or (sp < -1e-6 and sq > 1e-6):
+            t = sp / (sp - sq)
+            m = (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+            segs = [(p, m), (m, q)]
+        for a_, b_ in segs:
+            if math.dist(a_, b_) < 0.5:
+                continue
+            ha0, hb0 = h(regs[0], a_), h(regs[0], b_)
+            ha1, hb1 = h(regs[1], a_), h(regs[1], b_)
+            low = 0 if (ha0 + hb0) < (ha1 + hb1) else 1
+            hi = 1 - low
+            lo_a, lo_b = (ha0, hb0) if low == 0 else (ha1, hb1)
+            hi_a, hi_b = (ha1, hb1) if low == 0 else (ha0, hb0)
+            if max(hi_a - lo_a, hi_b - lo_b) < 1:
+                continue
+            dx, dz = b_[0] - a_[0], b_[1] - a_[1]
+            n = (-dz, dx)
+            toward_ref = n[0] * (ref[0] - a_[0]) + n[1] * (ref[1] - a_[1]) >= 0
+            if toward_ref != (low == ref_side):
+                n = (dz, -dx)
+            # Lava says what its banks are made of; otherwise the higher ground does
+            if regs[hi].spill and regs[hi].mat == regs[low].mat:
+                wm = regs[hi].spill
+            else:
+                wm = regs[low].wall or regs[hi].wall or c.get("wall", wall_mat_default)
+            self.a.wall_quad(wm, a_, b_, lo_a, hi_a, lo_b, hi_b, (n[0], 0, n[1]))
+
+    def _flat_runs(self, flat):
+        """Merge level cells that share a row, height and region into strips
+        (deep sea floor, lake beds): far fewer collision triangles."""
         a = self.a
         cs = self.cell
+        for k in sorted({k for _, k in flat}):
+            row = sorted((i, flat[(i, kk)]) for (i, kk) in flat if kk == k)
+            n = 0
+            while n < len(row):
+                i0, (y, reg, surf) = row[n]
+                m = n
+                while (m + 1 < len(row) and row[m + 1][0] == row[m][0] + 1 and m - n < 15
+                       and row[m + 1][1][0] == y and row[m + 1][1][1] is reg):
+                    m += 1
+                i1 = row[m][0] + 1
+                (xa, za), (xb, zb) = self.corner(i0, k), self.corner(i1, k + 1)
+                w = a.level.mats[reg.mat].world
+                q = [(xa, y, za), (xb, y, za), (xb, y, zb), (xa, y, zb)]
+                uv = [(p[0] / w, p[2] / w) for p in q]
+                a.tri(reg.mat, q[0], q[1], q[2], (uv[0], uv[1], uv[2]), (0, 1, 0), 1.0, surf)
+                a.tri(reg.mat, q[0], q[2], q[3], (uv[0], uv[2], uv[3]), (0, 1, 0), 1.0, surf)
+                n = m + 1
+
+    def build(self, floor_normals=None, wall_mat_default="rock", skip_floor=None, merge_flat=False):
+        a = self.a
+        cs = self.cell
+        flat = {}
         # Edge index: 0 = -z (k), 1 = +x (i+1), 2 = +z (k+1), 3 = -x (i)
         edges = {0: ((0, 1), (0, -1)), 1: ((1, 2), (1, 0)), 2: ((2, 3), (0, 1)), 3: ((3, 0), (-1, 0))}
         for (i, k), c in self.cells.items():
             P = [self.corner(i, k), self.corner(i + 1, k), self.corner(i + 1, k + 1), self.corner(i, k + 1)]
-            f = c["floor"]
-            fm = c["mat"]
-            w = a.level.mats[fm].world
-            fp = [(P[j][0], f[j], P[j][1]) for j in range(4)]
-            uv = [(p[0] / w, p[2] / w) for p in fp]
-            surf = c.get("surface", "mat")
-            ns = None
-            if floor_normals:
-                ns = [floor_normals(p[0], p[2]) for p in fp]
-            if not (skip_floor and skip_floor(c)):
-                # Split along the shorter diagonal for nicer slopes
-                if abs(f[0] - f[2]) <= abs(f[1] - f[3]):
-                    a.tri(fm, fp[0], fp[1], fp[2], (uv[0], uv[1], uv[2]), (0, 1, 0), 1.0, surf,
-                          normals=(ns[0], ns[1], ns[2]) if ns else None)
-                    a.tri(fm, fp[0], fp[2], fp[3], (uv[0], uv[2], uv[3]), (0, 1, 0), 1.0, surf,
-                          normals=(ns[0], ns[2], ns[3]) if ns else None)
-                else:
-                    a.tri(fm, fp[0], fp[1], fp[3], (uv[0], uv[1], uv[3]), (0, 1, 0), 1.0, surf,
-                          normals=(ns[0], ns[1], ns[3]) if ns else None)
-                    a.tri(fm, fp[1], fp[2], fp[3], (uv[1], uv[2], uv[3]), (0, 1, 0), 1.0, surf,
-                          normals=(ns[1], ns[2], ns[3]) if ns else None)
+            f = c["eff"]
+            if c.get("region") is not None:
+                R = c["regions"]
+                if (merge_flat and all(r is R[0] for r in R) and max(f) - min(f) < 0.5 and not R[0].overlay
+                        and "surface" not in c and not (skip_floor and skip_floor(c))):
+                    s0 = R[0].surface
+                    flat[(i, k)] = (round(f[0]), R[0], a.level.mats[R[0].mat].surface if s0 == "mat" else s0)
+                elif not (skip_floor and skip_floor(c)):
+                    self._region_floor(i, k, c, floor_normals, wall_mat_default)
+            else:
+                fm = c["mat"]
+                w = a.level.mats[fm].world
+                fp = [(P[j][0], f[j], P[j][1]) for j in range(4)]
+                uv = [(p[0] / w, p[2] / w) for p in fp]
+                surf = c.get("surface", "mat")
+                ns = None
+                if floor_normals:
+                    ns = [floor_normals(p[0], p[2]) for p in fp]
+                if not (skip_floor and skip_floor(c)):
+                    # Split along the shorter diagonal for nicer slopes
+                    if abs(f[0] - f[2]) <= abs(f[1] - f[3]):
+                        a.tri(fm, fp[0], fp[1], fp[2], (uv[0], uv[1], uv[2]), (0, 1, 0), 1.0, surf,
+                              normals=(ns[0], ns[1], ns[2]) if ns else None)
+                        a.tri(fm, fp[0], fp[2], fp[3], (uv[0], uv[2], uv[3]), (0, 1, 0), 1.0, surf,
+                              normals=(ns[0], ns[2], ns[3]) if ns else None)
+                    else:
+                        a.tri(fm, fp[0], fp[1], fp[3], (uv[0], uv[1], uv[3]), (0, 1, 0), 1.0, surf,
+                              normals=(ns[0], ns[1], ns[3]) if ns else None)
+                        a.tri(fm, fp[1], fp[2], fp[3], (uv[1], uv[2], uv[3]), (0, 1, 0), 1.0, surf,
+                              normals=(ns[1], ns[2], ns[3]) if ns else None)
             ce = c.get("ceil")
             if ce is not None:
                 cm = c.get("ceilmat", c.get("wall", wall_mat_default))
@@ -384,6 +889,8 @@ class Grid:
                 a.tri(cm, cp[0], cp[1], cp[2], (cuv[0], cuv[1], cuv[2]), (0, -1, 0), 0.75)
                 a.tri(cm, cp[0], cp[2], cp[3], (cuv[0], cuv[2], cuv[3]), (0, -1, 0), 0.75)
             wm = c.get("wall", wall_mat_default)
+            ids = [(i, k), (i + 1, k), (i + 1, k + 1), (i, k + 1)]
+            R = c.get("regions")
             for e, ((j0, j1), (di, dk)) in edges.items():
                 nb = self.cells.get((i + di, k + dk))
                 p, q = P[j0], P[j1]
@@ -392,11 +899,25 @@ class Grid:
                     # Solid neighbour: wall from floor up to ceiling (or a tall cliff)
                     top0 = ce[j0] if ce is not None else f[j0] + c.get("cliff", 0)
                     top1 = ce[j1] if ce is not None else f[j1] + c.get("cliff", 0)
+                    if R is not None and R[j0].hkey != R[j1].hkey:
+                        # The floor steps along this edge: two pieces meeting at the cut
+                        xp = self._crossing(ids[j0], ids[j1], c["region"], _hkey)
+                        t = math.dist(p, xp) / cs
+                        b = c["floor"][j0] + (c["floor"][j1] - c["floor"][j0]) * t
+                        hx0 = R[j0].level if R[j0].level is not None else b - R[j0].drop
+                        hx1 = R[j1].level if R[j1].level is not None else b - R[j1].drop
+                        topx0 = top0 + (top1 - top0) * t if ce is not None else hx0 + c.get("cliff", 0)
+                        topx1 = top0 + (top1 - top0) * t if ce is not None else hx1 + c.get("cliff", 0)
+                        if top0 > f[j0] + 1 or topx0 > hx0 + 1:
+                            a.wall_quad(wm, p, xp, f[j0], top0, hx0, topx0, (-di, 0, -dk))
+                        if topx1 > hx1 + 1 or top1 > f[j1] + 1:
+                            a.wall_quad(wm, xp, q, hx1, topx1, f[j1], top1, (-di, 0, -dk))
+                        continue
                     if top0 > f[j0] + 1 or top1 > f[j1] + 1:
                         a.wall_quad(wm, p, q, f[j0], top0, f[j1], top1, (-di, 0, -dk))
                     continue
                 # Open neighbour: step/cliff where floors disagree (draw from the higher side)
-                nf = nb["floor"]
+                nf = nb["eff"]
                 # neighbour corner indices on the shared edge
                 nmap = {0: (3, 2), 1: (0, 3), 2: (1, 0), 3: (2, 1)}[e]
                 hn0, hn1 = nf[nmap[0]], nf[nmap[1]]
@@ -411,6 +932,8 @@ class Grid:
                             a.wall_quad(wm, p, q, ce[j0], hc0, ce[j1], hc1, out)
                 elif ce is not None and nb.get("ceil") is None:
                     pass
+        if flat:
+            self._flat_runs(flat)
 
 
 class Model:
@@ -469,6 +992,7 @@ class Level:
         self.mats = {}
         self.areas = {}
         self.models = []
+        self.scrolls = []
         self.tex_sizes = load_texture_sizes(root)
 
     def mat(self, name, tex, **kw):
@@ -507,6 +1031,8 @@ class Level:
         out.append(f"    gsDPSetCombineMode({cc}),")
         out.append("    gsSPClearGeometryMode(G_LIGHTING),")
         out.append(f"    gsDPLoadTextureBlock({m.tex}, {gfmt}, {gsiz}, {tw}, {th}, 0, {wrap}, {wrap}, {ms}, {mt}, G_TX_NOLOD, G_TX_NOLOD),")
+        if m.scroll:
+            out.append(f"    gsSPDisplayList({prefix}_scroll_{mat}),")
         out.append("    gsSPTexture(0xFFFF, 0xFFFF, 0, G_TX_RENDERTILE, G_ON),")
         n = len(tris) * 3
         for base in range(0, n, 15):
@@ -534,6 +1060,18 @@ class Level:
         for mname in sorted({m for m in area.tris}):
             out.append(f"extern const u8 {self.mats[mname].tex}[];")
         out.append("")
+        # Scrolling materials: the level's geo function rewrites these tile
+        # sizes every frame (see the level's scroll table).
+        for mname in sorted(m for m, t in area.tris.items() if t and self.mats[m].scroll):
+            m = self.mats[mname]
+            _, tw, th = self._tex_info(m.tex)
+            out.append(f"Gfx {p}_scroll_{mname}[] = {{")
+            out.append(f"    gsDPSetTileSize(G_TX_RENDERTILE, 0, 0, ({tw} - 1) << G_TEXTURE_IMAGE_FRAC, "
+                       f"({th} - 1) << G_TEXTURE_IMAGE_FRAC),")
+            out.append("    gsSPEndDisplayList(),")
+            out.append("};")
+            out.append("")
+            self.scrolls.append((f"{p}_scroll_{mname}", tw, th) + tuple(m.scroll))
         opaque, xlu = [], []
         for mname, tris in area.tris.items():
             if not tris:
@@ -603,6 +1141,16 @@ class Level:
         nvis = sum(len(t) for t in area.tris.values())
         ncol = sum(len(i) for _, i in groups)
         return nvis, len(verts), ncol
+
+    def write_scroll_table(self, path):
+        """Table of scrolling tile sizes for the level's geo function. Speeds
+        are in 1/32 texel per frame."""
+        out = ["// Generated by tools/new64. Do not edit.", "",
+               f"const struct New64TexScroll {self.short}_tex_scrolls[] = {{"]
+        for name, tw, th, ds, dt in self.scrolls:
+            out.append(f"    {{ {name}, {tw}, {th}, {int(ds)}, {int(dt)} }},")
+        out += ["    { NULL, 0, 0, 0, 0 },", "};", ""]
+        Path(path).write_text("\n".join(out))
 
     def write_model(self, model, path, layer_alpha=False):
         """Untextured, vertex-coloured model: one display list per part."""
